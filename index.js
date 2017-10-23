@@ -1833,7 +1833,7 @@ function membershipsCacheJob(job) {
 
 	// a job to handle paging of results from first call to memeberships
 	else if (job.type === "next")
-		promise = membershipPromise.data.next();
+		promise = job.data.next();
 
 	// promise for call to spark api
 	promise
@@ -1849,8 +1849,8 @@ function membershipsCacheJob(job) {
 		// there are more memberships to get for this space, so add a new job to the queue
 		if (memberships.hasNext()) {
 			addJob(jobs.cache.memberships, {
-            spaceId: membershipPromise.spaceId,
-            shortId: membershipPromise.shortId,
+            spaceId: job.spaceId,
+            shortId: job.shortId,
             type: "next",
             data: memberships
          });
