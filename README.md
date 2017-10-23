@@ -1,5 +1,7 @@
 # publicspaces-ciscospark
 
+Cisco Spark webhooks are expected at /api/webhooks.
+
 Create a .env file along side index.js. Here's the template
 
 ```
