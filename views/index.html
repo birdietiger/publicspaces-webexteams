@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title></title>
+
+	<link rel="stylesheet" href="css/font-awesome/css/font-awesome.min.css">
+	<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Raleway">
+	<!-- <link rel="stylesheet" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css" /> -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<link rel="stylesheet" href="css/app.css">
+
+</head>
+
+<body>
+
+<div class="site-wrapper">
+	<div class="site-wrapper-inner">
+		<div class="main-container">
+			<div class="inner cover">
+				<img id="logo"/>
+				<h2 id="title"></h2>
+				<h4 id="message"></h4>
+				<div class="row" id="body">
+					<div class="col-lg-12">
+						<div id="input"></div>
+						<div id="list"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="footer">
+			<div id="emailContainer">
+				<i class="fa fa-times"></i> <span id="email"></span>
+			</div>
+			<div id="support"><i class="fa fa-question-circle"></i> Help</div>
+		</div>
+	</div>
+</div>
+
+<div id="installedInputTemplate" class="hidden">
+	<div class="btn-group-lg">
+		<div>
+			<button type="button" class="btn btn-block btn-lg btn-installed" onClick="checkInstalled(false)">Cisco Spark is <u>not</u> installed</button>
+		</div>
+		<div>
+			<button type="button" class="btn btn-block btn-lg btn-installed" onClick="checkInstalled(true)">Cisco Spark is installed</button>
+		</div>
+	</div>
+</div>
+
+<div id="spaceListTemplate" class="hidden">
+	<!--
+	<table id="spaceList" cellspacing="0" width="100%">
+		<tbody>
+			<tr class="space"><td class="title">%TITLE%</td></tr>
+		</tbody>
+	</table>
+	-->
+	<div id="spaceLists">
+		<div id="spaceListJoin" class="list-group">
+		</div>
+		<h4 id="joinedLabel">Spaces You're In</h4>
+		<div id="spaceListJoined" class="list-group">
+		</div>
+	</div>
+</div>
+
+<div id="spaceTemplate" class="hidden">
+	<a class="space list-group-item %DISABLED%" href="%URL%"><span class="space-title">%TEXT%</span><span class="badge badge-default badge-pill">%HITS%</span></a>
+</div>
+
+<div id="searchInputTemplate" class="hidden">
+	<div class="input-group input-group-lg">
+		<input id="searchInput" type="text" class="form-control form-control-lg" placeholder="Search spaces to join...">
+		<span class="input-group-addon"><i class="fa fa-search"></i></span>
+	</div>
+</div>
+
+<div id="emailInputTemplate" class="hidden">
+	<div class="input-group input-group-lg">
+		<input id="emailInput" type="text" class="form-control" placeholder="Email...">
+		<span class="input-group-btn">
+			<button onClick="checkEmail()" class="btn btn-email" type="button">Next</button>
+		</span>
+	</div>
+</div>
+
+<div id="background"></div>
+
+<script src="//code.jquery.com/jquery-3.1.1.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="js/config.js"></script>
+<script src="js/cookies.js"></script>
+<script src="js/base64.js"></script>
+<script src="js/getParams.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
