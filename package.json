@@ -21,7 +21,7 @@
     "shortid": "^2.2.6",
     "validator": "^6.2.0",
     "winston": "^2.4.0"
-  }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/birdietiger/publicspaces-ciscospark.git"
