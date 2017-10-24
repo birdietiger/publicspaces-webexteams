@@ -159,9 +159,9 @@ function checkInstalled(state) {
 		joinSpace(shortId);
 	else {
 		if (state == true)
-			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
+			$('#message').html("Open the link in the Cisco Spark message from "+botName+" in this browser for verification.");
 		else {
-			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
+			$('#message').html("Open the link in the Cisco Spark message from "+botName+" in this browser for verification.");
 			if (navigator.userAgent.match(/(ip(od|hone|ad))/i))
 				sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			else if (navigator.userAgent.match(/android/i))

@@ -446,7 +446,7 @@ app.get('/api/auth/:email', function(req, res){
 		req.session.email = email;
 
 		// send verification message to user in spark
-		var markdown = "A request to verify your email was just made. [Click here if you did that]("+process.env.BASE_URL+"/auth/"+req.session.tempPwd+"). If you didn't, please ignore this message.";
+		var markdown = "A request to verify your email was just made. Open "+process.env.BASE_URL+"/auth/"+req.session.tempPwd+" in the same browser to complete verfication. If you didn't, please ignore this message.";
 		ciscospark.messages.create({
 			toPersonEmail: email,
 			markdown: markdown
