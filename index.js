@@ -846,11 +846,13 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 	}
 
 	// validate webhook hasn't been modified or faked
-	var hash = crypto.createHmac('sha1', process.env.CISCOSPARK_WEBHOOK_SECRET).update(req.body).digest('hex');
-	var sparkHash = req.get('X-Spark-Signature');
-	if (hash !== sparkHash) { 
-		log.error('invalid webhook: wrong hash');
-		return;
+	if (process.env.CISCOSPARK_WEBHOOK_SECRET) {
+		var hash = crypto.createHmac('sha1', process.env.CISCOSPARK_WEBHOOK_SECRET).update(req.body).digest('hex');
+		var sparkHash = req.get('X-Spark-Signature');
+		if (hash !== sparkHash) { 
+			log.error('invalid webhook: wrong hash');
+			return;
+		}
 	}
 
 	// continue to next matching route
