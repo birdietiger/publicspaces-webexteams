@@ -53,6 +53,11 @@ if (!process.env.SUPPORT_EMAIL)
 else
 	supportEmail = process.env.SUPPORT_EMAIL;
 
+if (!process.env.ADMIN_PORT)
+	console.log('Warn: admin apis are disabled. Specify a TCP port to use in environment as "ADMIN_PORT" to enable them.');
+else
+	console.log('Info: admin apis are enabled on port '+process.env.ADMIN_PORT);
+
 if (!process.env.PORT)
 	console.log('Warn: Specify a TCP port to use in environment as "PORT" or default port of 3000 will be used.');
 
@@ -188,6 +193,53 @@ const sessionMiddleware = session({
 
 // apply session middleware
 app.use(sessionMiddleware);
+
+// if admin api enabled, setup admin express using same options as app express
+if (process.env.ADMIN_PORT) {
+	const adminApp = express();
+	const adminRouter = express.Router();
+	adminApp.set('port', process.env.ADMIN_PORT);
+	if (process.env.REVERSE_PROXY)
+		adminApp.set('trust proxy', 1);
+	adminApp.use(expressWinston.logger({
+		transports: logTransports,
+		statusLevels: logStatusLevels
+	}));
+	adminApp.use(router);
+	adminApp.use(expressWinston.errorLogger({
+		transports: logTransports,
+		statusLevels: logStatusLevels
+	}));
+
+	// return jobs json
+	adminApp.get('/api/jobs/:type/:key/:data', function(req, res){
+		res.status(200).send(JSON.stringify(jobs[req.params.type][req.params.key][req.params.data]));
+	});
+
+	// return cache json
+	adminApp.get('/api/cache/:type/:key', function(req, res){
+		res.status(200).send(JSON.stringify(cache[req.params.type][req.params.key]));
+	});
+
+	// endpoint to check cache size from localhost only
+	adminApp.get('/api/cache/count', function(req, res){
+
+		var response = {
+			total: 0
+			};
+		Object.keys(cache).forEach(function(key){
+			response.total += Object.keys(cache[key]).length;
+		});
+		res.status(200).send(JSON.stringify(response));
+
+	});
+
+	// start express
+	var adminServer = adminApp.listen(adminApp.get('port'), function(){
+		log.info('Admin server listening on port '+adminServer.address().port);
+	});
+
+}
 
 // serve custom config for web app
 app.get('/js/config.js', function(req, res){
@@ -1856,9 +1908,8 @@ function membershipsCacheJob(job) {
          });
 		}
 
-		// done processing for space, so decrementing remaining jobs
-		else
-			jobs.cache.memberships.remaining--;
+		// done with job
+		completeJob(jobs.cache.memberships, job);
 
 	})
 
@@ -1868,26 +1919,26 @@ function membershipsCacheJob(job) {
 		// hit rate-limiting
 		if (err.statusCode === 429) {
 
+			log.warn('hit rate-limit while building memberships cache', err.headers["retry-after"]);
+
 			// get retry-after header so no new jobs are processed until we've waited
 			jobs.cache.memberships.wait = (new Date()).getTime() + (parseInt(err.headers["retry-after"])*1000) + 2000;
 
 			// add job back into queue. need to start over for this space
-			jobs.cache.memberships.queue.push({
-				spaceId: membershipPromise.spaceId,
-				type: "space"
-			});
+			addJob(jobs.cache.memberships, {
+            spaceId: job.spaceId,
+            shortId: job.shortId,
+            type: "space"
+         });
 
 		}
 
 		// error that we won't try to recover from
-		else {
+		else
+			log.error('spark api error while doing memberships cache job', err);
 
-			log.error(err);
-
-			// job is considered complete 
-			jobs.cache.memberships.remaining--;
-
-		}
+		// job is considered complete 
+		completeJob(jobs.cache.memberships, job);
 
 	});
 
@@ -1950,6 +2001,14 @@ var jobs = {
 			complete: membershipsCacheComplete
 		}
 	}
+}
+
+// done with a job
+function completeJob(jobs, job) {
+
+	// reduce remaining job count
+	jobs.remaining--;
+
 }
 
 // add job into queue
