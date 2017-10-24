@@ -455,8 +455,8 @@ function setup() {
 		installed = null;
 		eraseCookie(emailCookie);
 		eraseCookie(installedCookie);
-		eraseCookie(sidCookie);
 		cleanSidCookie(function(){
+			eraseCookie(sidCookie);
 			checkShortId();
 		});
 	});
