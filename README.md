@@ -8,6 +8,9 @@ Create a .env file along side index.js. Here's the template
 #Specify the port for epxress to listen on [optional; default = 3000]
 #PORT=3000
 
+#Specify the port for admin apis to listen on [optional]
+#ADMIN_PORT=3001
+
 #If a reverse web proxy is in front of express set to "true" [optional; default = false]
 #REVERSE_PROXY=true
 
