@@ -414,8 +414,7 @@ function setEmail() {
 	}
 }
 
-function cleanSidCookie() {
-	eraseCookie(sidCookie);
+function cleanSidCookie(callback) {
 	$.ajax({
 		method: 'GET',
 		url: './api/auth/clean',
@@ -427,7 +426,7 @@ function cleanSidCookie() {
 		//
 	})
 	.always(function() {
-		//
+		callback();
 	});
 }
 
@@ -448,16 +447,18 @@ function setup() {
 		});
 	}
 	$('#emailContainer').on('click', function() {
+		$("#emailContainer").hide();
 		$('#message').html('');
 		$('#input').html('');
 		$('#list').html('');
 		email = null;
 		installed = null;
 		eraseCookie(emailCookie);
-		cleanSidCookie();
 		eraseCookie(installedCookie);
-		$("#emailContainer").hide();
-		checkShortId();
+		eraseCookie(sidCookie);
+		cleanSidCookie(function(){
+			checkShortId();
+		});
 	});
 	$(window).bind( 'hashchange', function() {
 		$("#message").show();
