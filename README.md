@@ -1,6 +1,6 @@
 # publicspaces-ciscospark
 
-Cisco Spark webhooks are expected at /api/webhooks.
+For the bot to receive all notifications from Cisco Spark, webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
 
 Create a .env file along side index.js. Here's the template
 
