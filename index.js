@@ -85,7 +85,6 @@ const validator = require('validator');
 const crypto = require('crypto');
 const ciscospark = require('ciscospark/env');
 const qr = require('qr-image');
-const mongoose = require('mongoose').connect(process.env.MONGO_URI);
 const express = require('express');
 const session = require('express-session');
 const mongoDBStore = require('connect-mongodb-session')(session);
@@ -127,7 +126,7 @@ var log = new (winston.Logger)({
 	transports: logTransports
 });
 
-// define db schema 
+// Instantiate the model
 const Publicspace = require('./models/publicspace');
 
 // define express app

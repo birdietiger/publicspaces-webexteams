@@ -1,5 +1,9 @@
 // grab the things we need
 const mongoose = require('mongoose');
+
+// connect to db and define db schema
+mongoose.connect(process.env.MONGO_URI, {useMongoClient: true});
+
 const Schema = mongoose.Schema;
 
 // create a schema
