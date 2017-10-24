@@ -415,6 +415,7 @@ function setEmail() {
 }
 
 function cleanSidCookie() {
+	eraseCookie(sidCookie);
 	$.ajax({
 		method: 'GET',
 		url: './api/auth/clean',
@@ -426,7 +427,7 @@ function cleanSidCookie() {
 		//
 	})
 	.always(function() {
-		eraseCookie(sidCookie);
+		//
 	});
 }
 
