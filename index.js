@@ -234,7 +234,7 @@ if (process.env.ADMIN_PORT) {
 
 	});
 
-	// start express
+	// start admin express
 	var adminServer = adminApp.listen(adminApp.get('port'), function(){
 		log.info('Admin server listening on port '+adminServer.address().port);
 	});
