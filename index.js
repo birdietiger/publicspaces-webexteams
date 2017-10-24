@@ -260,7 +260,7 @@ app.get('/', function(req, res){
 });
 
 // authenticate user link
-app.get('/auth/:tempPwd', function(req, res){
+app.get('/verify/:tempPwd', function(req, res){
 
 	// must have tempPwd email and the tempPwd params must match
 	if (
@@ -446,7 +446,7 @@ app.get('/api/auth/:email', function(req, res){
 		req.session.email = email;
 
 		// send verification message to user in spark
-		var markdown = "A request to verify your email was just made. Open "+process.env.BASE_URL+"/auth/"+req.session.tempPwd+" in the same browser to complete verfication. If you didn't, please ignore this message.";
+		var markdown = "A request to verify your email was just made. Open "+process.env.BASE_URL+"/verify/"+req.session.tempPwd+" in the same browser to complete verfication. If you didn't, please ignore this message.";
 		ciscospark.messages.create({
 			toPersonEmail: email,
 			markdown: markdown
