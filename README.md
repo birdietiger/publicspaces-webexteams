@@ -1,4 +1,4 @@
-# publicspaces-ciscospark
+# Public Spaces for Cisco Spark
 
 For the bot to receive all notifications from Cisco Spark, webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
 
