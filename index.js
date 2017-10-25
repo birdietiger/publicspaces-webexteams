@@ -44,8 +44,8 @@ else
 if (!process.env.CISCOSPARK_WEBHOOK_SECRET)
 	console.log('Warn: You really should be using a webhook secret. Specify a Cisco Spark webhook secret in environment as "CISCOSPARK_WEBHOOK_SECRET".');
 
-if (!process.env.CISCOSPARK_SUPPORT_SPACE)
-	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_SUPPORT_SPACE" to receive errors in Cisco Spark.');
+if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_SUPPORT_SPACE_ID" to receive errors in Cisco Spark.');
 
 var supportEmail = '';
 if (!process.env.SUPPORT_EMAIL)
@@ -67,6 +67,9 @@ if (!process.env.CISCOSPARK_MESSAGES_PER_SECOND)
 
 if (!process.env.LOG_FILE)
 	console.log('Warn: No log file set, so just using console. Set "LOG_FILE" in environment to log to a file.');
+
+if (!process.env.ACCESS_LOG_FILE)
+	console.log('Warn: No access log file set. Set "ACCESS_LOG_FILE" in environment to log http requests and responses.');
 
 var logLevels = [ "error", "warn", "info", "verbose", "debug", "silly" ];
 var logLevel = "info";
@@ -91,12 +94,8 @@ const mongoDBStore = require('connect-mongodb-session')(session);
 
 // setup logging
 var logTransports = [];
+var accessLogTransports = [];
 var logConfig = winston.config;
-var logStatusLevels = {
-	success: "debug",
-	warn: "debug",
-	error: "info"
-}
 var logOptions = {
 	level: logLevel,
    timestamp: function() {
@@ -120,6 +119,12 @@ logTransports.push(new (winston.transports.Console)(logOptions));
 // if log file is set add it to transports
 if (process.env.LOG_FILE)
 	logTransports.push(new (winston.transports.File)(Object.assign(logOptions, { filename: process.env.LOG_FILE })));
+
+// if access log file is set add it to access transports
+if (process.env.ACCESS_LOG_FILE) {
+	expressWinston.responseWhitelist.push("body");
+	accessLogTransports.push(new (winston.transports.File)(Object.assign(logOptions, { filename: process.env.ACCESS_LOG_FILE })));
+}
 
 // create logger
 var log = new (winston.Logger)({
@@ -147,19 +152,21 @@ const textParser = new bodyParser.text({
 });
 
 // express-winston logger makes sense BEFORE the router.
-app.use(expressWinston.logger({
-	transports: logTransports,
-	statusLevels: logStatusLevels
-}));
+if (process.env.ACCESS_LOG_FILE) {
+	app.use(expressWinston.logger({
+		transports: accessLogTransports
+	}));
+}
 
 // use the router
 app.use(router);
 
 // express-winston errorLogger makes sense AFTER the router.
-app.use(expressWinston.errorLogger({
-	transports: logTransports,
-	statusLevels: logStatusLevels
-}));
+if (process.env.ACCESS_LOG_FILE) {
+	app.use(expressWinston.errorLogger({
+		transports: accessLogTransports
+	}));
+}
 
 // tell Express to serve files from our public folder
 app.use(express.static(path.join(__dirname, 'public')))
@@ -200,15 +207,17 @@ if (process.env.ADMIN_PORT) {
 	adminApp.set('port', process.env.ADMIN_PORT);
 	if (process.env.REVERSE_PROXY)
 		adminApp.set('trust proxy', 1);
-	adminApp.use(expressWinston.logger({
-		transports: logTransports,
-		statusLevels: logStatusLevels
-	}));
+	if (process.env.ACCESS_LOG_FILE) {
+		adminApp.use(expressWinston.logger({
+			transports: accessLogTransports
+		}));
+	}
 	adminApp.use(router);
-	adminApp.use(expressWinston.errorLogger({
-		transports: logTransports,
-		statusLevels: logStatusLevels
-	}));
+	if (process.env.ACCESS_LOG_FILE) {
+		adminApp.use(expressWinston.errorLogger({
+			transports: accessLogTransports
+		}));
+	}
 
 	// return jobs json
 	adminApp.get('/api/jobs/:type/:key/:data', function(req, res){
@@ -488,14 +497,14 @@ app.get('/api/auth/:email', function(req, res){
 	}
 
 	// if support space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_SUPPORT_SPACE)
+	else if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
 		sendValidation();
 
 	else {
 
 		// check if email is part of dir synced domain but email is not spark enabled
 		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_SUPPORT_SPACE,
+			roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
 			personEmail: email
 		})
 
@@ -538,14 +547,14 @@ app.get('/api/email/:email', function(req, res){
 	}
 
 	// if support space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_SUPPORT_SPACE)
+	else if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
 		res.json({ responseCode: 0 });
 
 	else {
 
 		// check if email is part of dir synced domain but email is not spark enabled
 		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_SUPPORT_SPACE,
+			roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
 			personEmail: email
 		})
 
@@ -707,7 +716,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				.then(function(people){
 
 					// new spark user
-					if (!people.items.length === 0)
+					if (people.items.length === 0)
 						addUser(spaceId, email);
 
 					// user exists
@@ -1617,7 +1626,7 @@ function handleErr(err, respond = false, spaceId = "", mesg = "") {
 function alertSupportSpace(req, code, message, err = null) {
 
 	// if support space not defined in env var return
-	if (!process.env.CISCOSPARK_SUPPORT_SPACE)
+	if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
 		return;
 
 	// if err is defined, get it into a string
@@ -1628,7 +1637,7 @@ function alertSupportSpace(req, code, message, err = null) {
 
 	// send message to space
 	ciscospark.messages.create({
-		roomId: process.env.CISCOSPARK_SUPPORT_SPACE,
+		roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
 		markdown: code+': '+message+err+headers
 	})
 	.then(function(space) {
