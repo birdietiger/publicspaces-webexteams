@@ -39,6 +39,9 @@ CISCOSPARK_ACCESS_TOKEN=
 #Where to store logs in machine-readable format [optional]
 #LOG_FILE=
 
+#Where to store http access logs in machine-readable format [optional]
+#ACCESS_LOG_FILE=
+
 #Set log level [optional; default = info]
 #"error", "warn", "info", "verbose", "debug", or "silly"
 #LOG_LEVEL=debug
