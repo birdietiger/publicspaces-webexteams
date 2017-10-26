@@ -1,6 +1,17 @@
 # Public Spaces for Cisco Spark
 
-For the bot to receive all notifications from Cisco Spark, webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
+Installation
+------------
+
+``` bash
+$ git clone https://github.com/birdietiger/publicspaces-ciscospark.git
+$ npm install
+```
+
+After it's installed you need to create a .env file or set environemnt variables based on the details below.
+
+Configruation
+------------
 
 Create a .env file along side index.js. Here's the template
 
@@ -46,3 +57,19 @@ CISCOSPARK_ACCESS_TOKEN=
 #"error", "warn", "info", "verbose", "debug", or "silly"
 #LOG_LEVEL=debug
 ```
+
+Cisco Spark Webhooks
+------------
+
+For the bot to receive all notifications from Cisco Spark, you must manually create a [webhook](https://developer.ciscospark.com/webhooks-explained.html). 
+
+It's probably easiest to use the Cisco Spark developer [API docs](https://developer.ciscospark.com/endpoint-webhooks-post.html).
+
+Webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
+
+Cisco Spark Webhooks require https, so take a look at the Reverse Web Proxy section.
+
+Reverse Web Proxy
+------------
+
+It's expected that you'll front end this app with a reverse web proxy as the app doesn't natively support https. Cisco Spark Webhooks require https, so that endpoint will have to have a proxy. While you could just put a proxy in front of the webhook endpoint, its recommend that all endpoints are served over https.
