@@ -869,10 +869,12 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 });
 
 // since webhook was validated, we can now process it
+var processingSpaces = [];
 app.post('/api/webhooks', function(req, res){
 
 	// create objext from body of webhook 
 	req.body = JSON.parse(req.body);
+	log.debug("webhook", req.body);
 
 	// if the event is a message to the bot and not created by the bot
 	if (
@@ -880,6 +882,8 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.event == 'created'
 		&& req.body.data.personEmail != botDetails.emails[0]
 		) {
+
+		log.info("message to the bot and not created by the bot");
 
 		// var to contain the response message
 		var response;
@@ -1335,6 +1339,8 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.event == 'updated'
 		) {
 
+		log.info("there was a change to the space that a bot is in");
+
 		// get details for space
 		ciscospark.rooms.get(req.body.data.id)
 
@@ -1392,6 +1398,8 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.data.personEmail.toLowerCase() != botDetails.emails[0].toLowerCase()
 		) {
 
+		log.info("there was a change to membership to a space for a user other than the bot");
+
 		// holds email in lowercase and spaceId
 		var email = req.body.data.personEmail.toLowerCase();
 		var spaceId = req.body.data.roomId;
@@ -1412,7 +1420,7 @@ app.post('/api/webhooks', function(req, res){
 					|| req.body.event == 'updated'
 					) {
 
-					// space doesn't exist in db. create one
+					// space doesn't exist in db. create one if not already processing it
 					if (!publicspace) {
 
 						// get details for space
@@ -1421,16 +1429,19 @@ app.post('/api/webhooks', function(req, res){
 						// got space details
 						.then(function(space) {
 
-							// create a public space
-							createPublicSpace(space, {}, function(options){
-	
-								// add membership cache
-								addCache(cache.memberships, email, options.shortId);
+							// if membership is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
 
-								// send details to space
-								sendJoinDetails(options);
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
 
-							});
+								// create a public space
+								createPublicSpace(space);
+
+							}
 
 						})
 
@@ -1442,10 +1453,16 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// space exists in db
-					else
+					else {
 
 						// add to membership cache
 						addCache(cache.memberships, email, publicspace.shortId);
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(req.body.data.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(req.body.data.roomId), 1);
+
+					}
 
 				}
 
@@ -1478,6 +1495,8 @@ app.post('/api/webhooks', function(req, res){
 			)
 		) {
 
+		log.info("there was a change to the bots membership to a space");
+
 		// find space in db
 		Publicspace.findOne({ 'spaceId': req.body.data.roomId }, function (err, publicspace) {
 
@@ -1500,18 +1519,18 @@ app.post('/api/webhooks', function(req, res){
 					// found space
 					.then(function(space) {
 
-						// if membership is for a group space
-						if (space.type == 'group') {
+						// if membership is for a group space and not working on processing this in another webhook
+						if (
+							space.type == 'group'
+							&& !processingSpaces.includes(space.id)
+							) {
+
+							// add space to processing state to avoid race condition of two db entries
+							processingSpaces.push(space.id);
 
 							// make it public
 							createPublicSpace(space); 
 
-							// add to one job to membership cache
-							addJob(jobs.cache.memberships, {
-								spaceId: space.id,
-								type: "space"
-							});
-							
 						}
 
 					})
@@ -1527,6 +1546,10 @@ app.post('/api/webhooks', function(req, res){
 
 			// found space in db
 			else {
+
+				// if in processing state, remove it
+				if (processingSpaces.includes(req.body.data.roomId))
+					processingSpaces.splice(processingSpaces.indexOf(req.body.data.roomId), 1);
 
 				// bot was removed from a space
 				if (req.body.event == 'deleted') {
@@ -1702,7 +1725,7 @@ function sendResponse(spaceId, markdown, files = []) {
 }
 
 // global function to post message about joining space
-function sendJoinDetails(publicspace, options = {}) {
+function sendJoinDetails(publicspace, show = {}) {
 
 	// check for bot membership in space
 	ciscospark.memberships.list({
@@ -1742,12 +1765,12 @@ function sendJoinDetails(publicspace, options = {}) {
 				response = who+" can join this space using ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")"+listed;
 
 			// add qr if requested
-			if (
-				typeof(options.qr) !== "undefined"
-				&& options.qr
-				) {
+			if (show.qr)
 				files = [ process.env.BASE_URL.replace(/\/$/, '')+qrPath+publicspace.shortId ];
-			}
+
+			// show list instructions
+         if (show.list)
+				response += "<br><br>**`@"+botDetails.displayName.split(' ')[0]+" list`** to publicly show this space at "+process.env.BASE_URL;
 
 			// send details in spark
 			sendResponse(publicspace.spaceId, response, files);
@@ -1834,16 +1857,25 @@ function createPublicSpace(space, optionsOverride, success = undefined) {
 
 			log.info("saved ", publicspace);
 
+			// show options
+			var show = { list: true };
+
 			// success callback if defined
 			if (typeof(success) === "function")
-				success(options);
+				success(options, show);
 
 			// default send join details
 			else
-				sendJoinDetails(options);
+				sendJoinDetails(options, show);
 
 		}
 
+	});
+
+	// add to one job to membership cache
+	addJob(jobs.cache.memberships, {
+		spaceId: space.id,
+		type: "space"
 	});
 
 }
