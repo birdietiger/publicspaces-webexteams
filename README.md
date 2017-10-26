@@ -8,12 +8,14 @@ $ git clone https://github.com/birdietiger/publicspaces-ciscospark.git
 $ npm install
 ```
 
-After it's installed you need to create a .env file or set environemnt variables based on the details below.
+After it's installed you need to configure it.
 
 Configruation
 ------------
 
-Create a .env file along side index.js. Here's the template
+Soem environment variable must be set for this to work. You can create a .env file or set environemnt variables based on the details below.
+
+If using a .env file, it must be in the same directory as index.js.
 
 ```
 #Specify the port for epxress to listen on [optional; default = 3000]
