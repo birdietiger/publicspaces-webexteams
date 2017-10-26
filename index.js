@@ -1000,8 +1000,19 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public
-							createPublicSpace(space);
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
+
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
+
+								// make it public
+								createPublicSpace(space);
+
+							}
 
 						})
 
@@ -1014,6 +1025,10 @@ app.post('/api/webhooks', function(req, res){
 
 					// found an entry in the db
 					else if (publicspace) {
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// set it so open to people outside org
 						publicspace.internal = false;
@@ -1049,8 +1064,19 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public
-							createPublicSpace(space, { internal: true, internalDomains: [ personDomain ] });
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
+
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
+
+								// make it public
+								createPublicSpace(space, { internal: true, internalDomains: [ personDomain ] });
+
+							}
 
 						})
 
@@ -1063,6 +1089,10 @@ app.post('/api/webhooks', function(req, res){
 
 					// found an entry in the db
 					else if (publicspace) {
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// set it so its restricted to internal
 						publicspace.internal = true;
@@ -1097,17 +1127,28 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// create space so not listed
-							createPublicSpace(space, {}, function(publicspace){
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
 
-								// send join link
-								sendJoinDetails(publicspace);
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
 
-								// let user know the space is not listed
-								response = "I've made sure this space isn't listed at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
-								sendResponse(space.id, response);
+								// create space so not listed
+								createPublicSpace(space, {}, function(publicspace){
 
-							});
+									// send join link
+									sendJoinDetails(publicspace);
+
+									// let user know the space is not listed
+									response = "I've made sure this space isn't listed at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
+									sendResponse(space.id, response);
+
+								});
+
+							}
 
 						})
 
@@ -1120,6 +1161,10 @@ app.post('/api/webhooks', function(req, res){
 
 					// found the space in the db
 					else if (publicspace) {
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// delist space 
 						publicspace.list = false;
@@ -1159,17 +1204,28 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public
-							createPublicSpace(space, { list: true }, function(publicspace){
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
 
-								// send join link
-								sendJoinDetails(publicspace);
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
 
-								// let user know the space is now public
-								response = "I've listed this space for all to see at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
-								sendResponse(space.id, response);
+								// make it public
+								createPublicSpace(space, { list: true }, function(publicspace){
 
-							});
+									// send join link
+									sendJoinDetails(publicspace);
+
+									// let user know the space is now public
+									response = "I've listed this space for all to see at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
+									sendResponse(space.id, response);
+
+								});
+
+							}
 
 						})
 
@@ -1182,6 +1238,10 @@ app.post('/api/webhooks', function(req, res){
 
 					// found the space in the db
 					else if (publicspace) {
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// make space public
 						publicspace.list = true;
@@ -1220,10 +1280,21 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public and send qr code to join
-							createPublicSpace(space, {}, function(publicspace){
-								sendJoinDetails(publicspace, { qr: true });
-							});
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
+
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
+
+								// make it public and send qr code to join
+								createPublicSpace(space, {}, function(publicspace){
+									sendJoinDetails(publicspace, { qr: true });
+								});
+
+							}
 
 						})
 
@@ -1235,8 +1306,15 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send qr code to join
-					else
+					else {
+
 						sendJoinDetails(publicspace, { qr: true });
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
+
+					}
 
 				});
 	
@@ -1262,8 +1340,19 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public
-							createPublicSpace(space);
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
+
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
+
+								// make it public
+								createPublicSpace(space);
+
+							}
 
 						})
 
@@ -1275,8 +1364,15 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send join details
-					else
+					else {
+
 						sendJoinDetails(publicspace);
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
+
+					}
 
 				});
 	
@@ -1301,11 +1397,22 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// make it public and send help details
-							createPublicSpace(space, {}, function(){
-								sendJoinDetails(publicspace);
-								sendHelpGroup(publicspace);
-							});
+							// if webhook is for a group space and not working on processing this in another webhook
+							if (
+								space.type == 'group'
+								&& !processingSpaces.includes(space.id)
+								) {
+
+								// add space to processing state to avoid race condition of two db entries
+								processingSpaces.push(space.id);
+
+								// make it public and send help details
+								createPublicSpace(space, {}, function(){
+									sendJoinDetails(publicspace);
+									sendHelpGroup(publicspace);
+								});
+
+							}
 
 						})
 
@@ -1317,8 +1424,15 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send help
-					else
+					else {
+
 						sendHelpGroup(publicspace);
+
+						// if in processing state, remove it
+						if (processingSpaces.includes(message.roomId))
+							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
+
+					}
 
 				});
 
@@ -1355,28 +1469,50 @@ app.post('/api/webhooks', function(req, res){
 					handleErr(err, true, space.id, "db failure");
 
 				// space doesn't exist in db. create one
-				else if (!publicspace)
-					createPublicSpace(space);
+				else if (!publicspace) {
+
+					// if webhook is for a group space and not working on processing this in another webhook
+					if (
+						space.type == 'group'
+						&& !processingSpaces.includes(space.id)
+						) {
+
+						// add space to processing state to avoid race condition of two db entries
+						processingSpaces.push(space.id);
+
+						createPublicSpace(space);
+
+					}
+
+				}
 
 				// space exists in db and something has changed
-				else if (
-					publicspace.isLocked !== space.isLocked
-					|| publicspace.title !== space.title
-					) {
+				else {
 
-					// set title in db
-					publicspace.title = space.title;
+					// if in processing state, remove it
+					if (processingSpaces.includes(space.id))
+						processingSpaces.splice(processingSpaces.indexOf(space.id), 1);
 
-					// space locked status hasn't changed so be silent in update as title doesn't matter
-					if (publicspace.isLocked === space.isLocked)
-						updatePublicSpace(publicspace, function(){
-							// do nothing
-						});
+					if (
+						publicspace.isLocked !== space.isLocked
+						|| publicspace.title !== space.title
+						) {
 
-					// locked status changed so need to update space with join details
-					else {
-						publicspace.isLocked = space.isLocked;
-						updatePublicSpace(publicspace);
+						// set title in db
+						publicspace.title = space.title;
+
+						// space locked status hasn't changed so be silent in update as title doesn't matter
+						if (publicspace.isLocked === space.isLocked)
+							updatePublicSpace(publicspace, function(){
+								// do nothing
+							});
+
+						// locked status changed so need to update space with join details
+						else {
+							publicspace.isLocked = space.isLocked;
+							updatePublicSpace(publicspace);
+						}
+
 					}
 
 				}
