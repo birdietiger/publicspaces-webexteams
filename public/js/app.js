@@ -252,7 +252,8 @@ function paintSearchInput() {
 function paintEmailInput() {
 	$('#input').html($('#emailInputTemplate').html());
 	$('#emailInput').keypress(function(e) { if(e.which == 13) { checkEmail(); } });
-	$('#emailInput').focus();
+	if (!(!!window.MSInputMethodContext && !!document.documentMode))
+		$('#emailInput').focus();
 	if (
 		typeof(_get['email']) !== 'undefined'
 		&& _get['email'] != ''
