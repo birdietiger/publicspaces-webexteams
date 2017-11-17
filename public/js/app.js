@@ -57,7 +57,7 @@ function sortBy(property) {
 	}
 }
 
-function paintSpacesList(spaces = {}) {
+function paintSpacesList() {
 
 	$("#message").html('');
 	$('#title').html('');
