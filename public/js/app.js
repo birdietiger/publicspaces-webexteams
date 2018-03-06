@@ -52,12 +52,32 @@ function sortBy(property) {
 		property = property.substr(1);
 	}
 	return function (a,b) {
-		var result = (a[property].toLowerCase() < b[property].toLowerCase()) ? -1 : (a[property].toLowerCase() > b[property].toLowerCase()) ? 1 : 0;
+		var result = (a[property].toString().toLowerCase() < b[property].toString().toLowerCase()) ? -1 : (a[property].toString().toLowerCase() > b[property].toString().toLowerCase()) ? 1 : 0;
 		return result * sortOrder;
 	}
 }
 
-function paintSpacesList() {
+function percentRank(array, n) {
+    var L = 0;
+    var S = 0;
+    var N = array.length
+
+    for (var i = 0; i < array.length; i++) {
+        if (array[i] < n) {
+            L += 1
+        } else if (array[i] === n) {
+            S += 1
+        } else {
+
+        }
+    }
+
+    var pct = (L + (0.5 * S)) / N
+
+    return pct
+}
+
+function paintSpacesList(spaces = {}) {
 
 	$("#message").html('');
 	$('#title').html('');
@@ -65,26 +85,39 @@ function paintSpacesList() {
 	if (Object.keys(spaces).length === 0)
 		return;
 
-	spaces.sort(sortBy("title"));
+	spaces.sort(sortBy("-updated"));
 
 	$('#list').html($('#spaceListTemplate').html());
 
+	var hitsArray = [];
 	spaces.forEach(function(space){
+		hitsArray.push(space.hits);
+	});
+
+	spaces.forEach(function(space){
+
+		var hits = '';
+		if (percentRank(hitsArray, space.hits) >= .66)
+			hits = '<span class="badge badge-default badge-pill fire"><i class="fa fa-fire"></i></span>';
+
 		var spaceHtml = $("#spaceTemplate").html()
 			.replace("%URL%", "./#"+space.shortId)
 			.replace("%TEXT%", space.title.truncString(60))
-			.replace("%HITS%", space.hits)
+			.replace("%HITS%", hits);
+
 		if (space.member) {
 			spaceHtml = spaceHtml
 				.replace("%DISABLED%", "disabled");
 			$("#spaceListJoined").append(spaceHtml);
 			$('#joinedLabel').show();
 		}
+
 		else {
 			spaceHtml = spaceHtml
 				.replace("%DISABLED%", "");
 			$("#spaceListJoin").append(spaceHtml);
 		}
+
 	});
 
 	$('#list').show();
@@ -99,10 +132,10 @@ function checkShortId() {
 	var icon, message;
 	$('#title').html('');
 	if (shortId == '') {
-		$('#title').html("<i class='fa fa-refresh fa-spin'></i>");
+		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
 		getSpaces(paintSpacesList);
 	} else {
-		$('#title').html("<i class='fa fa-refresh fa-spin'></i>");
+		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
 		$.ajax({
 			method: 'GET',
 			url: './api/shortid/'+shortId,
@@ -159,9 +192,9 @@ function checkInstalled(state) {
 		joinSpace(shortId);
 	else {
 		if (state == true)
-			$('#message').html("Open the link in the Cisco Spark message from "+botName+" in this browser for verification.");
+			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
 		else {
-			$('#message').html("Open the link in the Cisco Spark message from "+botName+" in this browser for verification.");
+			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
 			if (navigator.userAgent.match(/(ip(od|hone|ad))/i))
 				sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			else if (navigator.userAgent.match(/android/i))
@@ -182,7 +215,7 @@ function checkEmail() {
 	var url = './api/email/'+email;
 	if (shortId == '')
 		url = './api/auth/'+email
-	$('#message').html("<i class='fa fa-refresh fa-spin'></i>");
+	$('#message').html("<i class='fa fa-sync fa-spin'></i>");
 	$.ajax({
 		url : url,
 		type: "GET",
@@ -252,8 +285,7 @@ function paintSearchInput() {
 function paintEmailInput() {
 	$('#input').html($('#emailInputTemplate').html());
 	$('#emailInput').keypress(function(e) { if(e.which == 13) { checkEmail(); } });
-	if (!(!!window.MSInputMethodContext && !!document.documentMode))
-		$('#emailInput').focus();
+	$('#emailInput').focus();
 	if (
 		typeof(_get['email']) !== 'undefined'
 		&& _get['email'] != ''
@@ -386,7 +418,7 @@ function handleBotResults(data) {
 
 function joinSpace(shortId) {
 	//var message = "Adding to Cisco Spark space";
-	$('#message').html("<i class='fa fa-refresh fa-spin'></i>");
+	$('#message').html("<i class='fa fa-sync fa-spin'></i>");
 	$.ajax({
 		url : './api/shortid/'+shortId,
 		type: "POST",
@@ -415,7 +447,7 @@ function setEmail() {
 	}
 }
 
-function cleanSidCookie(callback) {
+function cleanSidCookie() {
 	$.ajax({
 		method: 'GET',
 		url: './api/auth/clean',
@@ -427,12 +459,8 @@ function cleanSidCookie(callback) {
 		//
 	})
 	.always(function() {
-		callback();
+		eraseCookie(sidCookie);
 	});
-}
-
-function sortBy(property) {
-	var sortOrder = 1;
 }
 
 function setup() {
@@ -448,18 +476,16 @@ function setup() {
 		});
 	}
 	$('#emailContainer').on('click', function() {
-		$("#emailContainer").hide();
 		$('#message').html('');
 		$('#input').html('');
 		$('#list').html('');
 		email = null;
 		installed = null;
 		eraseCookie(emailCookie);
+		cleanSidCookie();
 		eraseCookie(installedCookie);
-		cleanSidCookie(function(){
-			eraseCookie(sidCookie);
-			checkShortId();
-		});
+		$("#emailContainer").hide();
+		checkShortId();
 	});
 	$(window).bind( 'hashchange', function() {
 		$("#message").show();
