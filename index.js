@@ -44,8 +44,17 @@ else
 if (!process.env.CISCOSPARK_WEBHOOK_SECRET)
 	console.log('Warn: You really should be using a webhook secret. Specify a Cisco Spark webhook secret in environment as "CISCOSPARK_WEBHOOK_SECRET".');
 
+if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
+	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_ADMIN_SPACE_ID" to receive errors in Cisco Spark.');
+
 if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
-	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_SUPPORT_SPACE_ID" to receive errors in Cisco Spark.');
+	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_SUPPORT_SPACE_ID" to allow users to join the support space in Cisco Spark.');
+
+var sourceUrl = 'https://github.com/birdietiger/publicspaces-ciscospark';
+if (!process.env.SOURCE_URL)
+	console.log('Warn: You can set a source code url in environment as "SOURCE_URL". Using default source code url of '+sourceUrl);
+else
+	sourceUrl = process.env.SUPPORT_EMAIL;
 
 var supportEmail = '';
 if (!process.env.SUPPORT_EMAIL)
@@ -61,15 +70,12 @@ else
 if (!process.env.PORT)
 	console.log('Warn: Specify a TCP port to use in environment as "PORT" or default port of 3000 will be used.');
 
-const messagesPerSecond = process.env.CISCOSPARK_MESSAGES_PER_SECOND || 6;
+const messagesPerSecond = process.env.CISCOSPARK_MESSAGES_PER_SECOND || 4;
 if (!process.env.CISCOSPARK_MESSAGES_PER_SECOND)
     console.log('Warn: Using default messages per second of '+messagesPerSecond+'. Specify "CISCOSPARK_MESSAGES_PER_SECOND" in environment.');
 
 if (!process.env.LOG_FILE)
 	console.log('Warn: No log file set, so just using console. Set "LOG_FILE" in environment to log to a file.');
-
-if (!process.env.ACCESS_LOG_FILE)
-	console.log('Warn: No access log file set. Set "ACCESS_LOG_FILE" in environment to log http requests and responses.');
 
 var logLevels = [ "error", "warn", "info", "verbose", "debug", "silly" ];
 var logLevel = "info";
@@ -88,14 +94,19 @@ const validator = require('validator');
 const crypto = require('crypto');
 const ciscospark = require('ciscospark/env');
 const qr = require('qr-image');
+const mongoose = require('mongoose').connect(process.env.MONGO_URI);
 const express = require('express');
 const session = require('express-session');
 const mongoDBStore = require('connect-mongodb-session')(session);
-
+ 
 // setup logging
 var logTransports = [];
-var accessLogTransports = [];
 var logConfig = winston.config;
+var logStatusLevels = {
+	success: "debug",
+	warn: "debug",
+	error: "info"
+}
 var logOptions = {
 	level: logLevel,
    timestamp: function() {
@@ -120,18 +131,12 @@ logTransports.push(new (winston.transports.Console)(logOptions));
 if (process.env.LOG_FILE)
 	logTransports.push(new (winston.transports.File)(Object.assign(logOptions, { filename: process.env.LOG_FILE })));
 
-// if access log file is set add it to access transports
-if (process.env.ACCESS_LOG_FILE) {
-	expressWinston.responseWhitelist.push("body");
-	accessLogTransports.push(new (winston.transports.File)(Object.assign(logOptions, { filename: process.env.ACCESS_LOG_FILE })));
-}
-
 // create logger
 var log = new (winston.Logger)({
 	transports: logTransports
 });
 
-// Instantiate the model
+// define db schema 
 const Publicspace = require('./models/publicspace');
 
 // define express app
@@ -152,21 +157,19 @@ const textParser = new bodyParser.text({
 });
 
 // express-winston logger makes sense BEFORE the router.
-if (process.env.ACCESS_LOG_FILE) {
-	app.use(expressWinston.logger({
-		transports: accessLogTransports
-	}));
-}
+app.use(expressWinston.logger({
+	transports: logTransports,
+	statusLevels: logStatusLevels
+}));
 
 // use the router
 app.use(router);
 
 // express-winston errorLogger makes sense AFTER the router.
-if (process.env.ACCESS_LOG_FILE) {
-	app.use(expressWinston.errorLogger({
-		transports: accessLogTransports
-	}));
-}
+app.use(expressWinston.errorLogger({
+	transports: logTransports,
+	statusLevels: logStatusLevels
+}));
 
 // tell Express to serve files from our public folder
 app.use(express.static(path.join(__dirname, 'public')))
@@ -207,17 +210,15 @@ if (process.env.ADMIN_PORT) {
 	adminApp.set('port', process.env.ADMIN_PORT);
 	if (process.env.REVERSE_PROXY)
 		adminApp.set('trust proxy', 1);
-	if (process.env.ACCESS_LOG_FILE) {
-		adminApp.use(expressWinston.logger({
-			transports: accessLogTransports
-		}));
-	}
+	adminApp.use(expressWinston.logger({
+		transports: logTransports,
+		statusLevels: logStatusLevels
+	}));
 	adminApp.use(router);
-	if (process.env.ACCESS_LOG_FILE) {
-		adminApp.use(expressWinston.errorLogger({
-			transports: accessLogTransports
-		}));
-	}
+	adminApp.use(expressWinston.errorLogger({
+		transports: logTransports,
+		statusLevels: logStatusLevels
+	}));
 
 	// return jobs json
 	adminApp.get('/api/jobs/:type/:key/:data', function(req, res){
@@ -268,7 +269,7 @@ app.get('/', function(req, res){
 });
 
 // authenticate user link
-app.get('/verify/:tempPwd', function(req, res){
+app.get('/auth/:tempPwd', function(req, res){
 
 	// must have tempPwd email and the tempPwd params must match
 	if (
@@ -409,6 +410,7 @@ app.get('/api/spaces', function(req, res){
 					shortId: publicspace.shortId,
 					member: member,
 					created: publicspace.created,
+					updated: publicspace.updated,
 					title: publicspace.title,
 					hits: publicspace.hits
 				};
@@ -454,7 +456,7 @@ app.get('/api/auth/:email', function(req, res){
 		req.session.email = email;
 
 		// send verification message to user in spark
-		var markdown = "A request to verify your email was just made. Open "+process.env.BASE_URL+"/verify/"+req.session.tempPwd+" in the same browser to complete verfication. If you didn't, please ignore this message.";
+		var markdown = "A request to verify your email was just made. [Click here if you did that]("+process.env.BASE_URL+"./auth/"+req.session.tempPwd+"). If you didn't, please ignore this message.";
 		ciscospark.messages.create({
 			toPersonEmail: email,
 			markdown: markdown
@@ -496,15 +498,15 @@ app.get('/api/auth/:email', function(req, res){
 
 	}
 
-	// if support space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+	// if admin space is not defined we can't test email is enabled for spark 
+	else if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
 		sendValidation();
 
 	else {
 
 		// check if email is part of dir synced domain but email is not spark enabled
 		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
+			roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
 			personEmail: email
 		})
 
@@ -546,15 +548,15 @@ app.get('/api/email/:email', function(req, res){
 
 	}
 
-	// if support space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+	// if admin space is not defined we can't test email is enabled for spark 
+	else if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
 		res.json({ responseCode: 0 });
 
 	else {
 
 		// check if email is part of dir synced domain but email is not spark enabled
 		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
+			roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
 			personEmail: email
 		})
 
@@ -666,19 +668,19 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 	}
 
 	// get db entry for shortid
-	Publicspace.findOneAndUpdate({ 'shortId': shortId }, { $inc: { hits: 1 } }, { new: true }, function (err, publicspace) {
+	Publicspace.findOneAndUpdate({ 'shortId': shortId }, { $inc: { hits: 1 }, $set: { 'updated': new Date() } }, { new: true }, function (err, publicspace) {
 
 		// failure to query db
 		if (err) {
 			handleErr(err);
 			res.json({ responseCode: 4 });
-			alertSupportSpace(req, 4, 'failed to call db', err);
+			alertAdminSpace(req, 4, 'failed to call db', err);
 
 		// no valid space
 		} else if (!publicspace) {
 			log.error('invalid shortId ', shortId);
 			res.json({ responseCode: 4 });
-			alertSupportSpace(req, 4, 'no entry in db', err);
+			alertAdminSpace(req, 4, 'no entry in db', err);
 
 		// space is not active
 		} else if (!publicspace.active) {
@@ -716,13 +718,13 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				.then(function(people){
 
 					// new spark user
-					if (people.items.length === 0)
+					if (!people.items.length === 0)
 						addUser(spaceId, email);
 
 					// user exists
 					else {
 						res.json({ responseCode: 6 });
-						alertSupportSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
+						alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
 						// TODO see if bot is in space or not
 					}
 
@@ -732,7 +734,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					// TODO test to see if no user or just non-200 	
 					handleErr(err);
 					res.json({ responseCode: 6 });
-					alertSupportSpace(req, 6, 'couldnt get person details', err);
+					alertAdminSpace(req, 6, 'couldnt get person details', err);
 				
 				});
 
@@ -759,7 +761,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				// bot isn't a member
 				if (memberships.items.length === 0) {
 					res.json({ responseCode: 6 });
-					alertSupportSpace(req, 6, 'bot not in space', spaceId);
+					alertAdminSpace(req, 6, 'bot not in space', spaceId);
 				}
 
 				// if the space is locked and the bot isn't a mod
@@ -784,7 +786,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 						// failed to send message to space
 						handleErr(err);
 						res.json({ responseCode: 6 });
-						alertSupportSpace(req, 6, 'couldnt send message to locked space to add user', err);
+						alertAdminSpace(req, 6, 'couldnt send message to locked space to add user', err);
 
 					});
 
@@ -810,7 +812,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 						// failed to add user to space
 						handleErr(err);
 						res.json({ responseCode: 6 });
-						alertSupportSpace(req, 6, 'couldnt add user to space', err);
+						alertAdminSpace(req, 6, 'couldnt add user to space', err);
 
 					});
 
@@ -822,7 +824,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				// couldn't get membership for bot
 				handleErr(err);
 				res.json({ responseCode: 6 });
-				alertSupportSpace(req, 6, 'couldnt get bot membership details', err);
+				alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
 
 			});
 
@@ -832,7 +834,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			// couldn't get details on space
 			handleErr(err);
 			res.json({ responseCode: 6 });
-			alertSupportSpace(req, 6, 'couldnt get space details', err);
+			alertAdminSpace(req, 6, 'couldnt get space details', err);
 
 		});
 
@@ -869,12 +871,10 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 });
 
 // since webhook was validated, we can now process it
-var processingSpaces = [];
 app.post('/api/webhooks', function(req, res){
 
 	// create objext from body of webhook 
 	req.body = JSON.parse(req.body);
-	log.debug("webhook", req.body);
 
 	// if the event is a message to the bot and not created by the bot
 	if (
@@ -882,8 +882,6 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.event == 'created'
 		&& req.body.data.personEmail != botDetails.emails[0]
 		) {
-
-		log.info("message to the bot and not created by the bot");
 
 		// var to contain the response message
 		var response;
@@ -1000,19 +998,8 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// make it public
-								createPublicSpace(space);
-
-							}
+							// make it public
+							createPublicSpace(space);
 
 						})
 
@@ -1025,10 +1012,6 @@ app.post('/api/webhooks', function(req, res){
 
 					// found an entry in the db
 					else if (publicspace) {
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// set it so open to people outside org
 						publicspace.internal = false;
@@ -1064,19 +1047,8 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// make it public
-								createPublicSpace(space, { internal: true, internalDomains: [ personDomain ] });
-
-							}
+							// make it public
+							createPublicSpace(space, { internal: true, internalDomains: [ personDomain ] });
 
 						})
 
@@ -1089,10 +1061,6 @@ app.post('/api/webhooks', function(req, res){
 
 					// found an entry in the db
 					else if (publicspace) {
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// set it so its restricted to internal
 						publicspace.internal = true;
@@ -1127,28 +1095,17 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
+							// create space so not listed
+							createPublicSpace(space, {}, function(publicspace){
 
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
+								// send join link
+								sendJoinDetails(publicspace);
 
-								// create space so not listed
-								createPublicSpace(space, {}, function(publicspace){
+								// let user know the space is not listed
+								response = "I've made sure this space isn't listed at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
+								sendResponse(space.id, response);
 
-									// send join link
-									sendJoinDetails(publicspace);
-
-									// let user know the space is not listed
-									response = "I've made sure this space isn't listed at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
-									sendResponse(space.id, response);
-
-								});
-
-							}
+							});
 
 						})
 
@@ -1161,10 +1118,6 @@ app.post('/api/webhooks', function(req, res){
 
 					// found the space in the db
 					else if (publicspace) {
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// delist space 
 						publicspace.list = false;
@@ -1204,28 +1157,17 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
+							// make it public
+							createPublicSpace(space, { list: true }, function(publicspace){
 
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
+								// send join link
+								sendJoinDetails(publicspace);
 
-								// make it public
-								createPublicSpace(space, { list: true }, function(publicspace){
+								// let user know the space is now public
+								response = "I've listed this space for all to see at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
+								sendResponse(space.id, response);
 
-									// send join link
-									sendJoinDetails(publicspace);
-
-									// let user know the space is now public
-									response = "I've listed this space for all to see at ["+process.env.BASE_URL+"]("+process.env.BASE_URL+")";
-									sendResponse(space.id, response);
-
-								});
-
-							}
+							});
 
 						})
 
@@ -1238,10 +1180,6 @@ app.post('/api/webhooks', function(req, res){
 
 					// found the space in the db
 					else if (publicspace) {
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
 
 						// make space public
 						publicspace.list = true;
@@ -1259,6 +1197,44 @@ app.post('/api/webhooks', function(req, res){
 
 				});
 
+			}
+
+			// add the user to the support space for this bot if support space id provided
+			else if (
+						process.env.CISCOSPARK_SUPPORT_SPACE_ID
+						&& message.text.match(/\bsupport\b/i)
+						) {
+
+				// add person to support space
+				ciscospark.memberships.create({
+					personId: message.personId,
+					roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID
+				})
+
+				// spark api call worked
+				.then(function(membership) {
+
+					sendResponse(message.roomId, "<@personId:"+message.personId+"> I've added you to the support space");
+
+				})
+
+				// failed to call spark api
+				.catch(function(err){
+
+					if (err.name === "Conflict")
+						sendResponse(message.roomId, "<@personId:"+message.personId+"> You're already in the support space");
+					else {
+						sendResponse(message.roomId, "<@personId:"+message.personId+"> I wasn't able to add you to the support space");
+						handleErr(err, false, '', "Couldn't add "+message.personEmail+" to the support space "+process.env.CISCOSPARK_SUPPORT_SPACE_ID);
+					}
+
+				});
+
+			}
+
+			// send source link
+			else if (message.text.match(/\bsource\b/i)) {
+				sendResponse(message.roomId, "You can find the source code for me at " + sourceUrl);
 			}
 
 			// send qr code to space
@@ -1280,21 +1256,10 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// make it public and send qr code to join
-								createPublicSpace(space, {}, function(publicspace){
-									sendJoinDetails(publicspace, { qr: true });
-								});
-
-							}
+							// make it public and send qr code to join
+							createPublicSpace(space, {}, function(publicspace){
+								sendJoinDetails(publicspace, { qr: true });
+							});
 
 						})
 
@@ -1306,15 +1271,8 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send qr code to join
-					else {
-
+					else
 						sendJoinDetails(publicspace, { qr: true });
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
-
-					}
 
 				});
 	
@@ -1340,19 +1298,8 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// make it public
-								createPublicSpace(space);
-
-							}
+							// make it public
+							createPublicSpace(space);
 
 						})
 
@@ -1364,15 +1311,8 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send join details
-					else {
-
+					else
 						sendJoinDetails(publicspace);
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
-
-					}
 
 				});
 	
@@ -1397,22 +1337,11 @@ app.post('/api/webhooks', function(req, res){
 						// found space
 						.then(function(space) {
 
-							// if webhook is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// make it public and send help details
-								createPublicSpace(space, {}, function(){
-									sendJoinDetails(publicspace);
-									sendHelpGroup(publicspace);
-								});
-
-							}
+							// make it public and send help details
+							createPublicSpace(space, {}, function(){
+								sendJoinDetails(publicspace);
+								sendHelpGroup(publicspace);
+							});
 
 						})
 
@@ -1424,15 +1353,8 @@ app.post('/api/webhooks', function(req, res){
 					}
 
 					// public space already exists in db. send help
-					else {
-
+					else
 						sendHelpGroup(publicspace);
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(message.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(message.roomId), 1);
-
-					}
 
 				});
 
@@ -1453,8 +1375,6 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.event == 'updated'
 		) {
 
-		log.info("there was a change to the space that a bot is in");
-
 		// get details for space
 		ciscospark.rooms.get(req.body.data.id)
 
@@ -1468,51 +1388,25 @@ app.post('/api/webhooks', function(req, res){
 				if (err) 
 					handleErr(err, true, space.id, "db failure");
 
-				// space doesn't exist in db. create one
-				else if (!publicspace) {
-
-					// if webhook is for a group space and not working on processing this in another webhook
-					if (
-						space.type == 'group'
-						&& !processingSpaces.includes(space.id)
-						) {
-
-						// add space to processing state to avoid race condition of two db entries
-						processingSpaces.push(space.id);
-
-						createPublicSpace(space);
-
-					}
-
-				}
-
 				// space exists in db and something has changed
-				else {
+				else if (
+					publicspace.isLocked !== space.isLocked
+					|| publicspace.title !== space.title
+					) {
 
-					// if in processing state, remove it
-					if (processingSpaces.includes(space.id))
-						processingSpaces.splice(processingSpaces.indexOf(space.id), 1);
+					// set title in db
+					publicspace.title = space.title;
 
-					if (
-						publicspace.isLocked !== space.isLocked
-						|| publicspace.title !== space.title
-						) {
+					// space locked status hasn't changed so be silent in update as title doesn't matter
+					if (publicspace.isLocked === space.isLocked)
+						updatePublicSpace(publicspace, function(){
+							// do nothing
+						});
 
-						// set title in db
-						publicspace.title = space.title;
-
-						// space locked status hasn't changed so be silent in update as title doesn't matter
-						if (publicspace.isLocked === space.isLocked)
-							updatePublicSpace(publicspace, function(){
-								// do nothing
-							});
-
-						// locked status changed so need to update space with join details
-						else {
-							publicspace.isLocked = space.isLocked;
-							updatePublicSpace(publicspace);
-						}
-
+					// locked status changed so need to update space with join details
+					else {
+						publicspace.isLocked = space.isLocked;
+						updatePublicSpace(publicspace);
 					}
 
 				}
@@ -1534,8 +1428,6 @@ app.post('/api/webhooks', function(req, res){
 		&& req.body.data.personEmail.toLowerCase() != botDetails.emails[0].toLowerCase()
 		) {
 
-		log.info("there was a change to membership to a space for a user other than the bot");
-
 		// holds email in lowercase and spaceId
 		var email = req.body.data.personEmail.toLowerCase();
 		var spaceId = req.body.data.roomId;
@@ -1556,49 +1448,11 @@ app.post('/api/webhooks', function(req, res){
 					|| req.body.event == 'updated'
 					) {
 
-					// space doesn't exist in db. create one if not already processing it
-					if (!publicspace) {
-
-						// get details for space
-						ciscospark.rooms.get(req.body.data.roomId)
-
-						// got space details
-						.then(function(space) {
-
-							// if membership is for a group space and not working on processing this in another webhook
-							if (
-								space.type == 'group'
-								&& !processingSpaces.includes(space.id)
-								) {
-
-								// add space to processing state to avoid race condition of two db entries
-								processingSpaces.push(space.id);
-
-								// create a public space
-								createPublicSpace(space);
-
-							}
-
-						})
-
-						// failed to get space details
-						.catch(function(err){
-							handleErr(err);
-						});
-
-					}
-
 					// space exists in db
-					else {
+					if (publicspace)
 
 						// add to membership cache
 						addCache(cache.memberships, email, publicspace.shortId);
-
-						// if in processing state, remove it
-						if (processingSpaces.includes(req.body.data.roomId))
-							processingSpaces.splice(processingSpaces.indexOf(req.body.data.roomId), 1);
-
-					}
 
 				}
 
@@ -1631,8 +1485,6 @@ app.post('/api/webhooks', function(req, res){
 			)
 		) {
 
-		log.info("there was a change to the bots membership to a space");
-
 		// find space in db
 		Publicspace.findOne({ 'spaceId': req.body.data.roomId }, function (err, publicspace) {
 
@@ -1646,7 +1498,6 @@ app.post('/api/webhooks', function(req, res){
 				// new or modified membership
 				if (
 					req.body.event == 'created'
-					|| req.body.event == 'updated'
 					) {
 
 					// get space details
@@ -1655,18 +1506,18 @@ app.post('/api/webhooks', function(req, res){
 					// found space
 					.then(function(space) {
 
-						// if membership is for a group space and not working on processing this in another webhook
-						if (
-							space.type == 'group'
-							&& !processingSpaces.includes(space.id)
-							) {
-
-							// add space to processing state to avoid race condition of two db entries
-							processingSpaces.push(space.id);
+						// if membership is for a group space
+						if (space.type == 'group') {
 
 							// make it public
 							createPublicSpace(space); 
 
+							// add to one job to membership cache
+							addJob(jobs.cache.memberships, {
+								spaceId: space.id,
+								type: "space"
+							});
+							
 						}
 
 					})
@@ -1682,10 +1533,6 @@ app.post('/api/webhooks', function(req, res){
 
 			// found space in db
 			else {
-
-				// if in processing state, remove it
-				if (processingSpaces.includes(req.body.data.roomId))
-					processingSpaces.splice(processingSpaces.indexOf(req.body.data.roomId), 1);
 
 				// bot was removed from a space
 				if (req.body.event == 'deleted') {
@@ -1781,11 +1628,11 @@ function handleErr(err, respond = false, spaceId = "", mesg = "") {
 
 }
 
-// global function to send message to spark support space
-function alertSupportSpace(req, code, message, err = null) {
+// global function to send message to spark admin space
+function alertAdminSpace(req, code, message, err = null) {
 
-	// if support space not defined in env var return
-	if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+	// if admin space not defined in env var return
+	if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
 		return;
 
 	// if err is defined, get it into a string
@@ -1796,7 +1643,7 @@ function alertSupportSpace(req, code, message, err = null) {
 
 	// send message to space
 	ciscospark.messages.create({
-		roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID,
+		roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
 		markdown: code+': '+message+err+headers
 	})
 	.then(function(space) {
@@ -1821,15 +1668,21 @@ function sendHelpDirect(spaceId) {
 
 // global function to send help
 function sendHelpGroup(publicspace) {
+	var supportMarkdown = '';
+	if (process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+		supportMarkdown = "**`support`** - Join the support space for this bot<br>\n";
 	var markdown = 
+		"@mention me with one of the following commands<br>\n\n"+
 		"**`url`** - Get details on how someone can join this space<br>\n"+
 		"**`list`** - Anyone can see this space listed at "+process.env.BASE_URL+"<br>\n"+
 		"**`list off`** - Remove this space from public listing at "+process.env.BASE_URL+"<br>\n"+
 		"**`internal`** - Only users from your domain can join this space<br>\n"+
 		"**`internal off`** - Anyone can join this space<br>\n"+
 		"**`qr`** - Get QR code to join this space<br>\n"+
+		"**`source`** - Get the link to the source code for this bot<br>\n"+
+		supportMarkdown+
 		"**`help`** - List commands<br>\n"+
-		"\nYou can message me directly to search public and internal spaces using **`search <query>`**.\n";
+		"\nYou can message me directly to search public and internal spaces.<br>\n\n";
 	sendResponse(publicspace.spaceId, markdown);
 }
 
@@ -1861,7 +1714,7 @@ function sendResponse(spaceId, markdown, files = []) {
 }
 
 // global function to post message about joining space
-function sendJoinDetails(publicspace, show = {}) {
+function sendJoinDetails(publicspace, options = {}) {
 
 	// check for bot membership in space
 	ciscospark.memberships.list({
@@ -1901,12 +1754,12 @@ function sendJoinDetails(publicspace, show = {}) {
 				response = who+" can join this space using ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")"+listed;
 
 			// add qr if requested
-			if (show.qr)
+			if (
+				typeof(options.qr) !== "undefined"
+				&& options.qr
+				) {
 				files = [ process.env.BASE_URL.replace(/\/$/, '')+qrPath+publicspace.shortId ];
-
-			// show list instructions
-         if (show.list)
-				response += "<br><br>**`@"+botDetails.displayName.split(' ')[0]+" list`** to publicly show this space at "+process.env.BASE_URL;
+			}
 
 			// send details in spark
 			sendResponse(publicspace.spaceId, response, files);
@@ -1993,25 +1846,19 @@ function createPublicSpace(space, optionsOverride, success = undefined) {
 
 			log.info("saved ", publicspace);
 
-			// show options
-			var show = { list: true };
-
 			// success callback if defined
 			if (typeof(success) === "function")
-				success(options, show);
+				success(options);
 
 			// default send join details
-			else
-				sendJoinDetails(options, show);
+			else {
+				sendJoinDetails(options);
+				sendHelpGroup(options);
+			}
+
 
 		}
 
-	});
-
-	// add to one job to membership cache
-	addJob(jobs.cache.memberships, {
-		spaceId: space.id,
-		type: "space"
 	});
 
 }
