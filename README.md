@@ -22,7 +22,7 @@ If using a .env file, it must be in the same directory as index.js.
 #PORT=3000
 
 #Specify the port for admin apis to listen on [optional]
-#ADMIN_PORT=3001
+#PORT=3001
 
 #If a reverse web proxy is in front of express set to "true" [optional; default = false]
 #REVERSE_PROXY=true
@@ -36,24 +36,27 @@ MONGO_URI=mongodb://localhost/publicspaces-ciscospark
 #The access token for the Cisco Spark bot [required]
 CISCOSPARK_ACCESS_TOKEN=
 
-#The Cisco Spark Space ID (roomId) that will have errors posted [optional]
-#CISCOSPARK_SUPPORT_SPACE_ID=
+#The Cisco Spark Space ID (roomId) that will have errors posted. Required to test existance of accounts in spark [optional]
+#CISCOSPARK_ADMIN_SPACE_ID=
 
 #Cisco Spark Webhook secret to verify authenticity of data [optional]
 #CISCOSPARK_WEBHOOK_SECRET=
 
-#Messages to send to Cisco Spark to avoid hit ratelimiting [optional; default = 6]
+#Messages to send to Cisco Spark to avoid hit ratelimiting [optional; default = 4]
 #Note: Currently only used during startup to build membership cache
-#CISCOSPARK_MESSAGES_PER_SECOND=6
+#CISCOSPARK_MESSAGES_PER_SECOND=4
+
+#The URL to the source code repository for this bot [optional; default = https://github.com/birdietiger/publicspaces-ciscospark]
+#SOURCE_URL=
+
+#The Cisco Spark Space ID (roomId) that users can join to get support [optional]
+#CISCOSPARK_SUPPORT_SPACE_ID=
 
 #Allows users of website to request support via email [optional]
 #SUPPORT_EMAIL=
 
 #Where to store logs in machine-readable format [optional]
 #LOG_FILE=
-
-#Where to store http access logs in machine-readable format [optional]
-#ACCESS_LOG_FILE=
 
 #Set log level [optional; default = info]
 #"error", "warn", "info", "verbose", "debug", or "silly"
