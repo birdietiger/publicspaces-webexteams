@@ -1,3 +1,8 @@
+.fire {
+	background: none;
+	color: darkorange;
+}
+
 #spaceLists {
 	margin-top: 20px;
 	text-align: left;
@@ -90,8 +95,8 @@ body {
 }
 
 #logo {
-	width: 25px;
 	border-radius: 50%;
+	width: 25px;
 }
 
 #message {
