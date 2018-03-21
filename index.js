@@ -875,6 +875,7 @@ app.post('/api/webhooks', function(req, res){
 
 	// create objext from body of webhook 
 	req.body = JSON.parse(req.body);
+	log.debug('webhook body: ', req.body);
 
 	// if the event is a message to the bot and not created by the bot
 	if (
