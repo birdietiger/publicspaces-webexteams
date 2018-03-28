@@ -618,7 +618,7 @@ app.get('/api/shortid/:shortId', function(req, res){
 
 				// found space
 				title = space.title;
-				res.json({ responseCode: 0, title: title, spaceId: space.id });
+				res.json({ responseCode: 0, title: title });
 
 			})
 			.catch(function(err){
@@ -675,20 +675,32 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			handleErr(err);
 			res.json({ responseCode: 4 });
 			alertAdminSpace(req, 4, 'failed to call db', err);
+		}
 
 		// no valid space
-		} else if (!publicspace) {
+		else if (!publicspace) {
 			log.error('invalid shortId ', shortId);
 			res.json({ responseCode: 4 });
 			alertAdminSpace(req, 4, 'no entry in db', err);
+		}
 
 		// space is not active
-		} else if (!publicspace.active) {
+		else if (!publicspace.active) {
 			log.error('no longer active shortId ', shortId);
 			res.json({ responseCode: 10 });
+		}
+
+		// space is internal and user is not in domain
+		else if (
+			publicspace.internal
+			&& publicspace.internalDomains.indexOf(email.split('@')[1]) === -1
+			) {
+			log.error(email+' not in internal space domains', publicspace.internalDomains);
+			res.json({ responseCode: 13 });
+		}
 
 		// things look good
-		} else {
+		else {
 
 			// space ID that user is trying to join
 			var spaceId = publicspace.spaceId;
@@ -702,7 +714,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 
 				// email is already in space
 				if (memberships.items.length === 1)
-					res.json({ responseCode: 5 });
+					res.json({ responseCode: 5, spaceId: spaceId });
 
 				// email is not in space
 				else
@@ -804,7 +816,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 
 						// was able to add user
 						log.info("added user to space", membership.id);
-						res.json({ responseCode: 0 });
+						res.json({ responseCode: 0, spaceId: spaceId });
 
 					})
 					.catch(function(err){
@@ -865,17 +877,100 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 		}
 	}
 
-	// continue to next matching route
-	next();
+	// create objext from body of webhook 
+	req.body = JSON.parse(req.body);
+	log.debug('webhook body: ', req.body);
+
+	// if the event is a message to the bot and not created by the bot, get details
+	if (
+		req.body.resource == 'messages'
+		&& req.body.event == 'created'
+		&& req.body.data.personEmail != botDetails.emails[0]
+		) {
+
+		// get the details of the message
+		ciscospark.messages.get(req.body.data.id)
+		.then(function(message){
+
+			// save the message details
+			req.body.message = message;
+
+			// if 1-1 space, don't make the rest of the spark API calls
+			if (req.body.data.roomType == 'direct') {
+				next();
+				return;
+			}
+
+			// get the details of the room
+			ciscospark.rooms.get(req.body.data.roomId)
+			.then(function(room){
+
+				// save the message details
+				req.body.room = room;
+
+				// get the membership details of the message
+				ciscospark.memberships.list({
+					roomId: req.body.data.roomId,
+					personId: req.body.data.personId
+				})
+
+				// successful call to memberships
+				.then(function(memberships){
+
+					// bot not a member
+					if (memberships.items.length === 0)
+						handleErr({}, false, {}, "bot not in space so can't send message");
+
+					// bot is a member
+					else {
+
+						// save membership detail
+						req.body.membership = memberships.items[0];
+
+						// continue to next matching route
+						next();
+
+					}
+
+				})
+
+				// couldn't get membership details
+				.catch(function(err){
+					handleErr(err, true, "personId="+req.body.data.personId+" roomId="+req.body.data.roomId, "couldn't get membership details");
+				});
+
+			})
+
+			// couldn't get room details
+			.catch(function(err){
+				handleErr(err, true, req.body.data.roomId, "couldn't get space details");
+			});
+
+
+		})
+
+		// couldn't get message details
+		.catch(function(err){
+			handleErr(err, true, req.body.data.id, "couldn't get message details");
+		});
+
+	// not a message or a message created by the bot
+	} else
+
+		// proceed to next stage
+		next();
+
 
 });
 
 // since webhook was validated, we can now process it
 app.post('/api/webhooks', function(req, res){
 
+/*
 	// create objext from body of webhook 
 	req.body = JSON.parse(req.body);
 	log.debug('webhook body: ', req.body);
+*/
 
 	// if the event is a message to the bot and not created by the bot
 	if (
@@ -890,9 +985,13 @@ app.post('/api/webhooks', function(req, res){
 		// get domain for message sender
 		var personDomain = req.body.data.personEmail.split("@")[1];
 
+		/*
 		// get the details of the message
 		ciscospark.messages.get(req.body.data.id)
 		.then(function(message){
+		*/
+
+		var message = req.body.message;
 
 			// doing search
 			if (message.roomType == 'direct') {
@@ -983,6 +1082,18 @@ app.post('/api/webhooks', function(req, res){
 			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\binternal\s+off\b/i)) {
 
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
 
@@ -1032,6 +1143,18 @@ app.post('/api/webhooks', function(req, res){
 			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\binternal\b/i)) {
 
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
 
@@ -1079,6 +1202,18 @@ app.post('/api/webhooks', function(req, res){
 			// don't show space publicly
 			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\blist\s+off\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
 
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -1141,6 +1276,18 @@ app.post('/api/webhooks', function(req, res){
 			// show space publicly
 			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\blist\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
 
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -1361,12 +1508,14 @@ app.post('/api/webhooks', function(req, res){
 
 			}
 
+		/*
 		})
 
 		// couldn't get message details
 		.catch(function(err){
 			handleErr(err, true, message.roomId, "couldn't get message details");
 		});
+		*/
 
 	}
 
@@ -1661,9 +1810,15 @@ function alertAdminSpace(req, code, message, err = null) {
 
 }
 
+// global function to notify user they don't have permission to send a command
+function sendPermissionDenied(spaceId) {
+	var markdown = "Only a moderator can send that command in a moderated space";
+	sendResponse(spaceId, markdown);
+}
+
 // global function to send direct help
 function sendHelpDirect(spaceId) {
-	var markdown = "I'll use messages you send in this space to search for public and internal spaces you can join. Add me to a group space so I can help people join there.";
+	var markdown = "I'll use messages you send in this space to search for public and internal spaces you can join. Add me to a group space so I can help people join there";
 	sendResponse(spaceId, markdown);
 }
 
