@@ -8,7 +8,6 @@ var email = readCookie(emailCookie);
 var installed = readCookie(installedCookie);
 var shortId;
 var spaceTitle;
-var spaceId;
 var spaceList;
 
 String.prototype.truncString = function(max, add){
@@ -160,7 +159,6 @@ function checkShortId() {
 				return;
 			} else {
 				spaceTitle = data.title;
-				spaceId = data.spaceId;
 				$('#title').html(spaceTitle);
 			}
 			if (email !== null && (installed !== null && installed == 'true')) {
@@ -310,36 +308,40 @@ function handleBotResults(data) {
 10=no longer active
 11=error, try again
 12=email not spark enabled
+13=can't add to internal only space
 */
 	var sparkUrl = null;
-	if (navigator.userAgent.match(/(ip(od|hone|ad))/i)) {
-		if (installed == 'true') {
-			sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+	var spaceId = data.spaceId;
+	if (spaceId !== undefined) {
+		if (navigator.userAgent.match(/(ip(od|hone|ad))/i)) {
+			if (installed == 'true') {
+				sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+			} else {
+				sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
+			}
+		} else if (navigator.userAgent.match(/android/i)) {
+			if (installed == 'true') {
+				sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+			} else {
+				sparkUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
+			}
 		} else {
-			sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
+			if (installed == 'true') {
+				sparkUrl = "https://web.ciscospark.com/rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+			} else {
+				sparkUrl = "https://www.ciscospark.com/downloads.html";
+			}
 		}
-	} else if (navigator.userAgent.match(/android/i)) {
-		if (installed == 'true') {
-			sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
-		} else {
-		//if (installed == 'false') {
-			sparkUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
-		}
-	} else {
-		if (installed == 'false') {
-			sparkUrl = "https://www.ciscospark.com/downloads.html";
-		} /* else {
-			sparkUrl = "https://web.ciscospark.com";
-		} */
 	}
+	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location = './'\">Discover More Spaces</button>";
 	if (sparkUrl !== null) {
 		var successText;
 		if (installed == 'true') successText = 'Open Cisco Spark';
 		else successText = 'Get Cisco Spark';
 		var successHtml = "<button class='btn btn-lg btn-block btn-success' onClick=\"window.location = '"+sparkUrl+"'\">"+successText+"</button>";
-		successHtml += "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location = './'\">Discover More Spaces</button>";
+		successHtml += discoverButtonHtml;
 	} else {
-		var successHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location = './'\">Discover More Spaces</button>";
+		var successHtml = discoverButtonHtml;
 	}
 
 	switch (data.responseCode) {
@@ -406,6 +408,13 @@ function handleBotResults(data) {
 			var message = "URL is no longer active";
 			$('#message').html(message);
 			$('#input').html('');
+			break;
+		case 13:
+			$('#title').html('');
+			setEmail();
+			var message = "Not permitted to Cisco Spark space";
+			$('#message').html(message);
+			$('#input').html(discoverButtonHtml);
 			break;
 		default:
 			setEmail();
