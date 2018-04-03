@@ -737,13 +737,11 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					else {
 						res.json({ responseCode: 6 });
 						alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
-						// TODO see if bot is in space or not
 					}
 
 				})
 				.catch(function(err){
 
-					// TODO test to see if no user or just non-200 	
 					handleErr(err);
 					res.json({ responseCode: 6 });
 					alertAdminSpace(req, 6, 'couldnt get person details', err);
@@ -1079,7 +1077,6 @@ app.post('/api/webhooks', function(req, res){
 			// rest of checks are for group spaces
 
 			// anyone can join space (default)
-			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\binternal\s+off\b/i)) {
 
 				// check if permitted to issue this command
@@ -1111,7 +1108,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public
-							createPublicSpace(space);
+							createPublicSpace(req, space);
 
 						})
 
@@ -1140,7 +1137,6 @@ app.post('/api/webhooks', function(req, res){
 
 			// don't show space externally
 			// TODO command to add/remove domains considered internal
-			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\binternal\b/i)) {
 
 				// check if permitted to issue this command
@@ -1172,7 +1168,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public
-							createPublicSpace(space, { internal: true, internalDomains: [ personDomain ] });
+							createPublicSpace(req, space, { internal: true, internalDomains: [ personDomain ] });
 
 						})
 
@@ -1200,7 +1196,6 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// don't show space publicly
-			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\blist\s+off\b/i)) {
 
 				// check if permitted to issue this command
@@ -1232,7 +1227,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// create space so not listed
-							createPublicSpace(space, {}, function(publicspace){
+							createPublicSpace(req, space, {}, function(publicspace){
 
 								// send join link
 								sendJoinDetails(publicspace);
@@ -1274,7 +1269,6 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// show space publicly
-			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\blist\b/i)) {
 
 				// check if permitted to issue this command
@@ -1306,7 +1300,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public
-							createPublicSpace(space, { list: true }, function(publicspace){
+							createPublicSpace(req, space, { list: true }, function(publicspace){
 
 								// send join link
 								sendJoinDetails(publicspace);
@@ -1405,7 +1399,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public and send qr code to join
-							createPublicSpace(space, {}, function(publicspace){
+							createPublicSpace(req, space, {}, function(publicspace){
 								sendJoinDetails(publicspace, { qr: true });
 							});
 
@@ -1427,7 +1421,6 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// get url to join space
-			// TODO if space is locked, only allow moderator to send this command
 			else if (message.text.match(/\burl\b/i)) {
 
 				// get space from db
@@ -1447,7 +1440,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public
-							createPublicSpace(space);
+							createPublicSpace(req, space);
 
 						})
 
@@ -1486,7 +1479,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public and send help details
-							createPublicSpace(space, {}, function(){
+							createPublicSpace(req, space, {}, function(){
 								sendJoinDetails(publicspace);
 								sendHelpGroup(publicspace);
 							});
@@ -1660,7 +1653,7 @@ app.post('/api/webhooks', function(req, res){
 						if (space.type == 'group') {
 
 							// make it public
-							createPublicSpace(space); 
+							createPublicSpace(req, space); 
 
 							// add to one job to membership cache
 							addJob(jobs.cache.memberships, {
@@ -1964,57 +1957,71 @@ function updatePublicSpace(publicspace, success = undefined) {
 }
 
 // global function to create new public space
-function createPublicSpace(space, optionsOverride, success = undefined) {
+function createPublicSpace(req, space, optionsOverride, success = undefined) {
 
-	// get new shortid
-	var shortId = ShortId.generate();
+	// get domain name to restrict initial space
+	ciscospark.people.list({
+		id: req.body.actorId
+	})
+	.then(function(person){
 
-	// set default options
-	var defaultOptions = {
-		spaceId: space.id,
-		isLocked: space.isLocked,
-		title: space.title,
-		shortId: shortId,
-		active: true,
-		list: false,
-		internal: false,
-		internalDomains: [],
-		hits: 0,
-		created: new Date(),
-		updated: new Date()
-		};
+		// get domain for user
+		var personDomain = person.items[0].emails[0].split("@")[1];
 
-	// override default options
-	var options = Object.assign({}, defaultOptions, optionsOverride);
+		// get new shortid
+		var shortId = ShortId.generate();
 
-	// create new public space object
-	var publicspace = new Publicspace(options);
+		// set default options
+		var defaultOptions = {
+			spaceId: space.id,
+			isLocked: space.isLocked,
+			title: space.title,
+			shortId: shortId,
+			active: true,
+			list: false,
+			internal: true,
+			internalDomains: [ personDomain ],
+			hits: 0,
+			created: new Date(),
+			updated: new Date()
+			};
 
-	// create entry in db
-	publicspace.save(function (err, data) {
+		// override default options
+		var options = Object.assign({}, defaultOptions, optionsOverride);
 
-		// failed to create db entry
-		if (err) 
-			handleErr(err, true, space.id, "failed to create db entry");
+		// create new public space object
+		var publicspace = new Publicspace(options);
 
-		// created new space entry
-		else {
+		// create entry in db
+		publicspace.save(function (err, data) {
 
-			log.info("saved ", publicspace);
+			// failed to create db entry
+			if (err) 
+				handleErr(err, true, space.id, "failed to create db entry");
 
-			// success callback if defined
-			if (typeof(success) === "function")
-				success(options);
-
-			// default send join details
+			// created new space entry
 			else {
-				sendJoinDetails(options);
-				sendHelpGroup(options);
+
+				log.info("saved ", publicspace);
+
+				// success callback if defined
+				if (typeof(success) === "function")
+					success(options);
+
+				// default send join details
+				else {
+					sendJoinDetails(options);
+					sendHelpGroup(options);
+				}
+
+
 			}
 
+		});
 
-		}
-
+	})
+	.catch(function(err){
+		handleErr(err, true, space.id, "failed to get webhook actor details");
 	});
 
 }
