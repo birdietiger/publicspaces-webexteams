@@ -76,8 +76,11 @@ function percentRank(array, n) {
     return pct
 }
 
-function paintSpacesList(spaces = {}) {
+function paintSpacesList(spaces) {
 
+	if (typeof spaces === "undefined")
+		spaces = {};
+	
 	$("#message").html('');
 	$('#title').html('');
 
