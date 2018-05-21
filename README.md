@@ -1,5 +1,7 @@
 # Public Spaces for Cisco Webex Teams
 
+> Cisco Spark is now Webex Teams! You will notice changes to this packages to reflect those changes. [Read why this is more than just a rebrand.](https://developer.webex.com/blog/blog-details-9738.html)
+
 Installation
 ------------
 
