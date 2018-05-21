@@ -1,10 +1,10 @@
-# Public Spaces for Cisco Spark
+# Public Spaces for Cisco Webex Teams
 
 Installation
 ------------
 
 ``` bash
-$ git clone https://github.com/birdietiger/publicspaces-ciscospark.git
+$ git clone https://github.com/birdietiger/publicspaces-webexteams.git
 $ npm install
 ```
 
@@ -31,26 +31,26 @@ If using a .env file, it must be in the same directory as index.js.
 BASE_URL=https://<hostname>/<path>
 
 #The Mongo DB URI to use to store data on public spaces and sessions [required]
-MONGO_URI=mongodb://localhost/publicspaces-ciscospark
+MONGO_URI=mongodb://localhost/publicspaces-webexteams
 
-#The access token for the Cisco Spark bot [required]
-CISCOSPARK_ACCESS_TOKEN=
+#The access token for the Cisco Webex Teams bot [required]
+WEBEXTEAMS_ACCESS_TOKEN=
 
-#The Cisco Spark Space ID (roomId) that will have errors posted. Required to test existance of accounts in spark [optional]
-#CISCOSPARK_ADMIN_SPACE_ID=
+#The Cisco Webex Teams Space ID (roomId) that will have errors posted. Required to test existance of accounts in Cisco Webex Teams [optional]
+#WEBEXTEAMS_ADMIN_SPACE_ID=
 
-#Cisco Spark Webhook secret to verify authenticity of data [optional]
-#CISCOSPARK_WEBHOOK_SECRET=
+#Cisco Webex Teams Webhook secret to verify authenticity of data [optional]
+#WEBEXTEAMS_WEBHOOK_SECRET=
 
-#Messages to send to Cisco Spark to avoid hit ratelimiting [optional; default = 4]
+#Messages to send to Cisco Webex Teams to avoid hit ratelimiting [optional; default = 4]
 #Note: Currently only used during startup to build membership cache
-#CISCOSPARK_MESSAGES_PER_SECOND=4
+#WEBEXTEAMS_MESSAGES_PER_SECOND=4
 
-#The URL to the source code repository for this bot [optional; default = https://github.com/birdietiger/publicspaces-ciscospark]
+#The URL to the source code repository for this bot [optional; default = https://github.com/birdietiger/publicspaces-webexteams]
 #SOURCE_URL=
 
-#The Cisco Spark Space ID (roomId) that users can join to get support [optional]
-#CISCOSPARK_SUPPORT_SPACE_ID=
+#The Cisco Webex Teams Space ID (roomId) that users can join to get support [optional]
+#WEBEXTEAMS_SUPPORT_SPACE_ID=
 
 #Allows users of website to request support via email [optional]
 #SUPPORT_EMAIL=
@@ -63,18 +63,18 @@ CISCOSPARK_ACCESS_TOKEN=
 #LOG_LEVEL=debug
 ```
 
-Cisco Spark Webhooks
+Cisco Webex Teams Webhooks
 ------------
 
-For the bot to receive all notifications from Cisco Spark, you must manually create a [webhook](https://developer.ciscospark.com/webhooks-explained.html). 
+For the bot to receive all notifications from Cisco Webex Teams, you must manually create a [webhook](https://developer.webex.com/webhooks-explained.html). 
 
-It's probably easiest to use the Cisco Spark developer [API docs](https://developer.ciscospark.com/endpoint-webhooks-post.html).
+It's probably easiest to use the Cisco Webex Teams developer [API docs](https://developer.webex.com/endpoint-webhooks-post.html).
 
 Webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
 
-Cisco Spark Webhooks require https, so take a look at the Reverse Web Proxy section.
+Cisco Webex Teams Webhooks require https, so take a look at the Reverse Web Proxy section.
 
 Reverse Web Proxy
 ------------
 
-It's expected that you'll front end this app with a reverse web proxy as the app doesn't natively support https. Cisco Spark Webhooks require https, so that endpoint will have to have a proxy. While you could just put a proxy in front of the webhook endpoint, its recommend that all endpoints are served over https.
+It's expected that you'll front end this app with a reverse web proxy as the app doesn't natively support https. Cisco Webex Teams Webhooks require https, so that endpoint will have to have a proxy. While you could just put a proxy in front of the webhook endpoint, its recommend that all endpoints are served over https.

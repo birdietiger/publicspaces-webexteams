@@ -32,7 +32,7 @@ function getSpaces(callback) {
 		}
 		else if (response.responseCode === -1) {
 			$('#title').html('Discover More Spaces');
-			$('#message').html("You must verify your email via a Spark message.");
+			$('#message').html("You must verify your email via a Webex Teams message.");
 			paintEmailInput();
 		}
 	})
@@ -193,16 +193,16 @@ function checkInstalled(state) {
 		joinSpace(shortId);
 	else {
 		if (state == true)
-			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
 		else {
-			$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
 			if (navigator.userAgent.match(/(ip(od|hone|ad))/i))
-				sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
+				teamsUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			else if (navigator.userAgent.match(/android/i))
-				sparkUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
+				teamsUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
 			else
-				sparkUrl = "https://www.ciscospark.com/downloads.html";
-      	var html = "<button class='btn btn-lg btn-block btn-success' onClick=\"window.location = '"+sparkUrl+"'\">Get Cisco Spark</button>"
+				teamsUrl = "https://www.webex.com/downloads.html";
+      	var html = "<button class='btn btn-lg btn-block btn-success' onClick=\"window.location = '"+teamsUrl+"'\">Get Webex Teams</button>"
 			$('#input').html(html);
 		}
 	}
@@ -233,13 +233,13 @@ function checkEmail() {
 					if (shortId != '')
 						joinSpace(shortId);
 					else
-						$('#message').html("Follow the link in the Cisco Spark message you just got to verify your email.");
+						$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
 				} else {
 					$('#input').html($('#installedInputTemplate').html());
 				}
 				break;
 			case 12:
-				$('#message').html("Email is not Cisco Spark enabled. Contact your IT administrator.");
+				$('#message').html("Email is not Webex Teams enabled. Contact your IT administrator.");
 				paintEmailInput();
 				break;
 			default:
@@ -305,43 +305,43 @@ function handleBotResults(data) {
 4=invlaid session
 5=already in space
 6=failed to add to space
-7=new spark user and added to space
+7=new teams user and added to space
 8=client side ajax error
 9=asked to join a space
 10=no longer active
 11=error, try again
-12=email not spark enabled
+12=email not teams enabled
 13=can't add to internal only space
 */
-	var sparkUrl = null;
+	var teamsUrl = null;
 	var spaceId = data.spaceId;
 	if (spaceId !== undefined) {
 		if (navigator.userAgent.match(/(ip(od|hone|ad))/i)) {
 			if (installed == 'true') {
-				sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+				teamsUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
 			} else {
-				sparkUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
+				teamsUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			}
 		} else if (navigator.userAgent.match(/android/i)) {
 			if (installed == 'true') {
-				sparkUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+				teamsUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
 			} else {
-				sparkUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
+				teamsUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
 			}
 		} else {
 			if (installed == 'true') {
-				sparkUrl = "https://web.ciscospark.com/rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+				teamsUrl = "https://teams.webex.com/spaces/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
 			} else {
-				sparkUrl = "https://www.ciscospark.com/downloads.html";
+				teamsUrl = "https://www.webex.com/downloads.html";
 			}
 		}
 	}
 	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location = './'\">Discover More Spaces</button>";
-	if (sparkUrl !== null) {
+	if (teamsUrl !== null) {
 		var successText;
-		if (installed == 'true') successText = 'Open Cisco Spark';
-		else successText = 'Get Cisco Spark';
-		var successHtml = "<button class='btn btn-lg btn-block btn-success' onClick=\"window.location = '"+sparkUrl+"'\">"+successText+"</button>";
+		if (installed == 'true') successText = 'Open Webex Teams';
+		else successText = 'Get Webex Teams';
+		var successHtml = "<button class='btn btn-lg btn-block btn-success' onClick=\"window.location = '"+teamsUrl+"'\">"+successText+"</button>";
 		successHtml += discoverButtonHtml;
 	} else {
 		var successHtml = discoverButtonHtml;
@@ -350,7 +350,7 @@ function handleBotResults(data) {
 	switch (data.responseCode) {
 		case 0:
 			setEmail();
-			$('#message').html('Added to Cisco Spark space');
+			$('#message').html('Added to Webex Teams space');
 			$('#input').html(successHtml);
 			break;
 		case 1:
@@ -377,24 +377,24 @@ function handleBotResults(data) {
 			break;
 		case 5:
 			setEmail();
-			$('#message').html("Already in Cisco Spark space");//+'<br/><span>'+spaceTitle+'</span><br/><span>'+message+'</span>');
+			$('#message').html("Already in Webex Teams space");//+'<br/><span>'+spaceTitle+'</span><br/><span>'+message+'</span>');
 			$('#input').html(successHtml);
 			break;
 		case 6:
 			setEmail();
-			var message = "Couldn't add to Cisco Spark space<br/>Admins have been notified";
+			var message = "Couldn't add to Webex Teams space<br/>Admins have been notified";
 			$('#message').html(message);
 			$('#input').html('');
 			break;
 		case 7:
 			setEmail();
-			var message = "Added to Cisco Spark space<br/>Check your email for instructions";
+			var message = "Added to Webex Teams space<br/>Check your email for instructions";
 			$('#message').html(message);
 			$('#input').html('');
 			break;
 		case 8:
 			setEmail();
-			var message = "Couldn't add to Cisco Spark space";
+			var message = "Couldn't add to Webex Teams space";
 			if (supportEmail != '')
 				message += "<br/>Contact <a href='mailto:"+supportEmail+"'>"+supportEmail+"</a>";
 			$('#message').html(message);
@@ -415,13 +415,13 @@ function handleBotResults(data) {
 		case 13:
 			$('#title').html('');
 			setEmail();
-			var message = "Not permitted to Cisco Spark space";
+			var message = "Not permitted to Webex Teams space";
 			$('#message').html(message);
 			$('#input').html(discoverButtonHtml);
 			break;
 		default:
 			setEmail();
-			var message = "Failed to add to Cisco Spark space<br/>Admins have been notified";
+			var message = "Failed to add to Webex Teams space<br/>Admins have been notified";
 			$('#message').html(message);
 			$('#input').html('');
 			break;
@@ -429,7 +429,7 @@ function handleBotResults(data) {
 }
 
 function joinSpace(shortId) {
-	//var message = "Adding to Cisco Spark space";
+	//var message = "Adding to Webex Teams space";
 	$('#message').html("<i class='fa fa-sync fa-spin'></i>");
 	$.ajax({
 		url : './api/shortid/'+shortId,
@@ -478,11 +478,11 @@ function cleanSidCookie() {
 function setup() {
 	$('#logo').attr('src', botAvatar);
 	$('#logo').attr('title', botName+' ('+botEmail+')');
-	document.title = botName+' | Join Spark Spaces';
+	document.title = botName+' | Join Webex Teams Spaces';
 	$('<style>.site-wrapper:before{background-image:url('+botAvatar+')}</style>').appendTo('head');
 	if (supportEmail != '') {
 		$('#support').show();
-		var supportSubject = 'Question about joining Cisco Spark Space via '+botName+' ('+botEmail+')';
+		var supportSubject = 'Question about joining Webex Teams Space via '+botName+' ('+botEmail+')';
 		$('#support').on('click', function() {
 			window.location.href='mailto:'+supportEmail+'?subject='+supportSubject+' '+shortId+'&body='+window.location.href;
 		});

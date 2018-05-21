@@ -18,8 +18,8 @@ if (!process.env.BASE_URL) {
 	process.exit(1);
 }
 
-if (!process.env.CISCOSPARK_ACCESS_TOKEN) {
-	console.log('Error: Specify a Cisco Spark access token in environment as "CISCOSPARK_ACCESS_TOKEN".');
+if (!process.env.WEBEXTEAMS_ACCESS_TOKEN) {
+	console.log('Error: Specify a Webex Teams access token in environment as "WEBEXTEAMS_ACCESS_TOKEN".');
 	process.exit(1);
 }
 
@@ -27,11 +27,11 @@ if (!process.env.CISCOSPARK_ACCESS_TOKEN) {
 /*
 var webAuth = "oauth";
 if (
-	!process.env.CISCOSPARK_CLIENT_ID
-	|| !process.env.CISCOSPARK_CLIENT_SECRET
-	|| !process.env.CISCOSPARK_OAUTH_URL
+	!process.env.WEBEXTEAMS_CLIENT_ID
+	|| !process.env.WEBEXTEAMS_CLIENT_SECRET
+	|| !process.env.WEBEXTEAMS_OAUTH_URL
 	) {
-	console.log('Warn: Specify "CISCOSPARK_CLIENT_ID", "CISCOSPARK_CLIENT_SECRET", and "CISCOSPARK_OAUTH_URL" in environment if you want use Spark authentication.');
+	console.log('Warn: Specify "WEBEXTEAMS_CLIENT_ID", "WEBEXTEAMS_CLIENT_SECRET", and "WEBEXTEAMS_OAUTH_URL" in environment if you want use Webex Teams authentication.');
 	webAuth = "url";
 }
 */
@@ -41,16 +41,16 @@ if (!process.env.REVERSE_PROXY)
 else
 	console.log('Warn: Make sure that your reverse proxy is set to rewrite the cookie path correctly.');
 
-if (!process.env.CISCOSPARK_WEBHOOK_SECRET)
-	console.log('Warn: You really should be using a webhook secret. Specify a Cisco Spark webhook secret in environment as "CISCOSPARK_WEBHOOK_SECRET".');
+if (!process.env.WEBEXTEAMS_WEBHOOK_SECRET)
+	console.log('Warn: You really should be using a webhook secret. Specify a Webex Teams webhook secret in environment as "WEBEXTEAMS_WEBHOOK_SECRET".');
 
-if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
-	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_ADMIN_SPACE_ID" to receive errors in Cisco Spark.');
+if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
+	console.log('Warn: Specify a Webex Teams Room/Space ID in environment as "WEBEXTEAMS_ADMIN_SPACE_ID" to receive errors in Webex Teams.');
 
-if (!process.env.CISCOSPARK_SUPPORT_SPACE_ID)
-	console.log('Warn: Specify a Cisco Spark Room/Space ID in environment as "CISCOSPARK_SUPPORT_SPACE_ID" to allow users to join the support space in Cisco Spark.');
+if (!process.env.WEBEXTEAMS_SUPPORT_SPACE_ID)
+	console.log('Warn: Specify a Webex Teams Room/Space ID in environment as "WEBEXTEAMS_SUPPORT_SPACE_ID" to allow users to join the support space in Webex Teams.');
 
-var sourceUrl = 'https://github.com/birdietiger/publicspaces-ciscospark';
+var sourceUrl = 'https://github.com/birdietiger/publicspaces-webexteams';
 if (!process.env.SOURCE_URL)
 	console.log('Warn: You can set a source code url in environment as "SOURCE_URL". Using default source code url of '+sourceUrl);
 else
@@ -70,9 +70,9 @@ else
 if (!process.env.PORT)
 	console.log('Warn: Specify a TCP port to use in environment as "PORT" or default port of 3000 will be used.');
 
-const messagesPerSecond = process.env.CISCOSPARK_MESSAGES_PER_SECOND || 4;
-if (!process.env.CISCOSPARK_MESSAGES_PER_SECOND)
-    console.log('Warn: Using default messages per second of '+messagesPerSecond+'. Specify "CISCOSPARK_MESSAGES_PER_SECOND" in environment.');
+const messagesPerSecond = process.env.WEBEXTEAMS_MESSAGES_PER_SECOND || 4;
+if (!process.env.WEBEXTEAMS_MESSAGES_PER_SECOND)
+    console.log('Warn: Using default messages per second of '+messagesPerSecond+'. Specify "WEBEXTEAMS_MESSAGES_PER_SECOND" in environment.');
 
 if (!process.env.LOG_FILE)
 	console.log('Warn: No log file set, so just using console. Set "LOG_FILE" in environment to log to a file.');
@@ -92,7 +92,7 @@ const path = require('path');
 const ShortId = require('shortid');
 const validator = require('validator');
 const crypto = require('crypto');
-const ciscospark = require('ciscospark/env');
+const webexteams = require('ciscospark/env');
 const qr = require('qr-image');
 const mongoose = require('mongoose').connect(process.env.MONGO_URI);
 const express = require('express');
@@ -189,7 +189,7 @@ sessionStore.on('error', function(error) {
 // create middleware for sessions
 const sessionMiddleware = session({
 	store: sessionStore,
-	secret: crypto.createHash('sha256').update(process.env.CISCOSPARK_ACCESS_TOKEN).digest('base64'),
+	secret: crypto.createHash('sha256').update(process.env.WEBEXTEAMS_ACCESS_TOKEN).digest('base64'),
 	resave: false,
 	saveUninitialized: true,
 	name: 'sid',
@@ -281,8 +281,8 @@ app.get('/auth/:tempPwd', function(req, res){
 		// users email
 		var email = req.session.email;
 
-		// remove the verify spark message to keep things clean. don't care about return
-		ciscospark.messages.remove(req.session.authMessageId)
+		// remove the verify teams message to keep things clean. don't care about return
+		webexteams.messages.remove(req.session.authMessageId)
 		.then(function(){})
 		.catch(function(err){});
 
@@ -430,7 +430,7 @@ app.get('/api/spaces', function(req, res){
 app.get('/api/auth/clean', function(req, res){
 	res.status(200).send();
 	if (req.session.authMessageId) {
-		ciscospark.messages.remove(req.session.authMessageId)
+		webexteams.messages.remove(req.session.authMessageId)
 		.then(function(){})
 		.catch(function(err){});
 	}
@@ -455,19 +455,19 @@ app.get('/api/auth/:email', function(req, res){
 		// save users email
 		req.session.email = email;
 
-		// send verification message to user in spark
+		// send verification message to user in teams
 		var markdown = "A request to verify your email was just made. [Click here if you did that]("+process.env.BASE_URL+"./auth/"+req.session.tempPwd+"). If you didn't, please ignore this message.";
-		ciscospark.messages.create({
+		webexteams.messages.create({
 			toPersonEmail: email,
 			markdown: markdown
 		})
 
-		// spark api call worked
+		// teams api call worked
 		.then(function(message) {
 
 			// if there's an existing verificaiton message, remove it
 			if (req.session.authMessageId) {
-				ciscospark.messages.remove(req.session.authMessageId)
+				webexteams.messages.remove(req.session.authMessageId)
 				.then(function(){})
 				.catch(function(err){});
 			}
@@ -480,7 +480,7 @@ app.get('/api/auth/:email', function(req, res){
 
 		})
 
-		// failed to call spark api
+		// failed to call teams api
 		.catch(function(err){
 			handleErr(err);
 			res.json({ responseCode: 11 });
@@ -498,15 +498,15 @@ app.get('/api/auth/:email', function(req, res){
 
 	}
 
-	// if admin space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
+	// if admin space is not defined we can't test email is enabled for teams 
+	else if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
 		sendValidation();
 
 	else {
 
-		// check if email is part of dir synced domain but email is not spark enabled
-		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
+		// check if email is part of dir synced domain but email is not teams enabled
+		webexteams.memberships.list({
+			roomId: process.env.WEBEXTEAMS_ADMIN_SPACE_ID,
 			personEmail: email
 		})
 
@@ -518,7 +518,7 @@ app.get('/api/auth/:email', function(req, res){
 		// failure
 		.catch(function(err){
 
-			// domain is dir sync'd and email is not spark enabled
+			// domain is dir sync'd and email is not teams enabled
 			if (err.body.message == "Failed to find user with specified email address.")
 				res.json({ responseCode: 12 });
 
@@ -548,15 +548,15 @@ app.get('/api/email/:email', function(req, res){
 
 	}
 
-	// if admin space is not defined we can't test email is enabled for spark 
-	else if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
+	// if admin space is not defined we can't test email is enabled for teams 
+	else if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
 		res.json({ responseCode: 0 });
 
 	else {
 
-		// check if email is part of dir synced domain but email is not spark enabled
-		ciscospark.memberships.list({
-			roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
+		// check if email is part of dir synced domain but email is not teams enabled
+		webexteams.memberships.list({
+			roomId: process.env.WEBEXTEAMS_ADMIN_SPACE_ID,
 			personEmail: email
 		})
 
@@ -568,7 +568,7 @@ app.get('/api/email/:email', function(req, res){
 		// failure
 		.catch(function(err){
 
-			// domain is dir sync'd and email is not spark enabled
+			// domain is dir sync'd and email is not teams enabled
 			if (err.body.message == "Failed to find user with specified email address.")
 				res.json({ responseCode: 12 });
 
@@ -582,7 +582,7 @@ app.get('/api/email/:email', function(req, res){
 
 });
 
-// endpoint to validate short id and get spark space details
+// endpoint to validate short id and get teams space details
 app.get('/api/shortid/:shortId', function(req, res){
 
 	// shortId from url
@@ -613,7 +613,7 @@ app.get('/api/shortid/:shortId', function(req, res){
 			var title = 'Unknown';
 
 			// get space details
-			ciscospark.rooms.get(publicspace.spaceId)
+			webexteams.rooms.get(publicspace.spaceId)
 			.then(function(space) {
 
 				// found space
@@ -641,7 +641,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 	/*
 	possible response codes
 	0=added to space
-	2=email is not spark enabled
+	2=email is not teams enabled
 	3=invlaid email
 	4=invlaid session
 	5=already in space
@@ -706,7 +706,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			var spaceId = publicspace.spaceId;
 
 			// check if email is in space 
-			ciscospark.memberships.list({
+			webexteams.memberships.list({
 				roomId: spaceId,
 				personEmail: email
 			})
@@ -723,13 +723,13 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			})
 			.catch(function(err){
 
-				// check if its an existing spark user
-				ciscospark.people.list({
+				// check if its an existing teams user
+				webexteams.people.list({
 					email: email
 				})
 				.then(function(people){
 
-					// new spark user
+					// new teams user
 					if (!people.items.length === 0)
 						addUser(spaceId, email);
 
@@ -758,11 +758,11 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 	function addUser(spaceId, email) {
 
 		// get space details to determine if its currently locked
-		ciscospark.rooms.get(spaceId)
+		webexteams.rooms.get(spaceId)
 		.then(function(space){
 
 			// check to see if bot is a member of the space
-			ciscospark.memberships.list({
+			webexteams.memberships.list({
 				roomId: spaceId,
 				personEmail: botDetails.emails[0]
 			})
@@ -781,7 +781,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					) {
 
 					// message the space that the user is requesting access
-					ciscospark.messages.create({
+					webexteams.messages.create({
 						roomId: spaceId,
 						markdown: email+' would like to join this space'
 					})
@@ -806,7 +806,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				else {
 
 					// add user to space
-					ciscospark.memberships.create({
+					webexteams.memberships.create({
 						roomId: spaceId,
 						personEmail: email
 					})
@@ -852,7 +852,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 
 });
 
-// validate webhook from spark cloud
+// validate webhook from teams cloud
 app.post('/api/webhooks', textParser, function(req, res, next){
 
 	// immediately return 200 so webhook isn't disabled
@@ -866,10 +866,10 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 	}
 
 	// validate webhook hasn't been modified or faked
-	if (process.env.CISCOSPARK_WEBHOOK_SECRET) {
-		var hash = crypto.createHmac('sha1', process.env.CISCOSPARK_WEBHOOK_SECRET).update(req.body).digest('hex');
-		var sparkHash = req.get('X-Spark-Signature');
-		if (hash !== sparkHash) { 
+	if (process.env.WEBEXTEAMS_WEBHOOK_SECRET) {
+		var hash = crypto.createHmac('sha1', process.env.WEBEXTEAMS_WEBHOOK_SECRET).update(req.body).digest('hex');
+		var teamsHash = req.get('X-Spark-Signature');
+		if (hash !== teamsHash) { 
 			log.error('invalid webhook: wrong hash');
 			return;
 		}
@@ -887,27 +887,27 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 		) {
 
 		// get the details of the message
-		ciscospark.messages.get(req.body.data.id)
+		webexteams.messages.get(req.body.data.id)
 		.then(function(message){
 
 			// save the message details
 			req.body.message = message;
 
-			// if 1-1 space, don't make the rest of the spark API calls
+			// if 1-1 space, don't make the rest of the teams API calls
 			if (req.body.data.roomType == 'direct') {
 				next();
 				return;
 			}
 
 			// get the details of the room
-			ciscospark.rooms.get(req.body.data.roomId)
+			webexteams.rooms.get(req.body.data.roomId)
 			.then(function(room){
 
 				// save the message details
 				req.body.room = room;
 
 				// get the membership details of the message
-				ciscospark.memberships.list({
+				webexteams.memberships.list({
 					roomId: req.body.data.roomId,
 					personId: req.body.data.personId
 				})
@@ -985,7 +985,7 @@ app.post('/api/webhooks', function(req, res){
 
 		/*
 		// get the details of the message
-		ciscospark.messages.get(req.body.data.id)
+		webexteams.messages.get(req.body.data.id)
 		.then(function(message){
 		*/
 
@@ -1102,7 +1102,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1162,7 +1162,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(message.roomId)
+						webexteams.rooms.get(message.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1221,7 +1221,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1294,7 +1294,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1343,31 +1343,31 @@ app.post('/api/webhooks', function(req, res){
 
 			// add the user to the support space for this bot if support space id provided
 			else if (
-						process.env.CISCOSPARK_SUPPORT_SPACE_ID
+						process.env.WEBEXTEAMS_SUPPORT_SPACE_ID
 						&& message.text.match(/\bsupport\b/i)
 						) {
 
 				// add person to support space
-				ciscospark.memberships.create({
+				webexteams.memberships.create({
 					personId: message.personId,
-					roomId: process.env.CISCOSPARK_SUPPORT_SPACE_ID
+					roomId: process.env.WEBEXTEAMS_SUPPORT_SPACE_ID
 				})
 
-				// spark api call worked
+				// teams api call worked
 				.then(function(membership) {
 
 					sendResponse(message.roomId, "<@personId:"+message.personId+"> I've added you to the support space");
 
 				})
 
-				// failed to call spark api
+				// failed to call teams api
 				.catch(function(err){
 
 					if (err.name === "Conflict")
 						sendResponse(message.roomId, "<@personId:"+message.personId+"> You're already in the support space");
 					else {
 						sendResponse(message.roomId, "<@personId:"+message.personId+"> I wasn't able to add you to the support space");
-						handleErr(err, false, '', "Couldn't add "+message.personEmail+" to the support space "+process.env.CISCOSPARK_SUPPORT_SPACE_ID);
+						handleErr(err, false, '', "Couldn't add "+message.personEmail+" to the support space "+process.env.WEBEXTEAMS_SUPPORT_SPACE_ID);
 					}
 
 				});
@@ -1393,7 +1393,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1434,7 +1434,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1473,7 +1473,7 @@ app.post('/api/webhooks', function(req, res){
 					else if (!publicspace) {
 
 						// get space details
-						ciscospark.rooms.get(req.body.data.roomId)
+						webexteams.rooms.get(req.body.data.roomId)
 
 						// found space
 						.then(function(space) {
@@ -1519,7 +1519,7 @@ app.post('/api/webhooks', function(req, res){
 		) {
 
 		// get details for space
-		ciscospark.rooms.get(req.body.data.id)
+		webexteams.rooms.get(req.body.data.id)
 
 		// got space details
 		.then(function(space) {
@@ -1644,7 +1644,7 @@ app.post('/api/webhooks', function(req, res){
 					) {
 
 					// get space details
-					ciscospark.rooms.get(req.body.data.roomId)
+					webexteams.rooms.get(req.body.data.roomId)
 
 					// found space
 					.then(function(space) {
@@ -1771,11 +1771,11 @@ function handleErr(err, respond = false, spaceId = "", mesg = "") {
 
 }
 
-// global function to send message to spark admin space
+// global function to send message to teams admin space
 function alertAdminSpace(req, code, message, err = null) {
 
 	// if admin space not defined in env var return
-	if (!process.env.CISCOSPARK_ADMIN_SPACE_ID)
+	if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
 		return;
 
 	// if err is defined, get it into a string
@@ -1785,8 +1785,8 @@ function alertAdminSpace(req, code, message, err = null) {
 	var headers = '<br><br>'+JSON.stringify(req.headers);
 
 	// send message to space
-	ciscospark.messages.create({
-		roomId: process.env.CISCOSPARK_ADMIN_SPACE_ID,
+	webexteams.messages.create({
+		roomId: process.env.WEBEXTEAMS_ADMIN_SPACE_ID,
 		markdown: code+': '+message+err+headers
 	})
 	.then(function(space) {
@@ -1818,7 +1818,7 @@ function sendHelpDirect(spaceId) {
 // global function to send help
 function sendHelpGroup(publicspace) {
 	var supportMarkdown = '';
-	if (process.env.CISCOSPARK_SUPPORT_SPACE_ID)
+	if (process.env.WEBEXTEAMS_SUPPORT_SPACE_ID)
 		supportMarkdown = "**`support`** - Join the support space for this bot<br>\n";
 	var markdown = 
 		"@mention me with one of the following commands<br>\n\n"+
@@ -1847,7 +1847,7 @@ function sendResponse(spaceId, markdown, files = []) {
 		options.files = files;
 
 	// send message
-	ciscospark.messages.create(options)
+	webexteams.messages.create(options)
 	.then(function(message) {
 
 		// message sent
@@ -1866,7 +1866,7 @@ function sendResponse(spaceId, markdown, files = []) {
 function sendJoinDetails(publicspace, options = {}) {
 
 	// check for bot membership in space
-	ciscospark.memberships.list({
+	webexteams.memberships.list({
 		roomId: publicspace.spaceId,
 		personEmail: botDetails.emails[0]
 	})
@@ -1910,7 +1910,7 @@ function sendJoinDetails(publicspace, options = {}) {
 				files = [ process.env.BASE_URL.replace(/\/$/, '')+qrPath+publicspace.shortId ];
 			}
 
-			// send details in spark
+			// send details in teams
 			sendResponse(publicspace.spaceId, response, files);
 
 		}
@@ -1960,7 +1960,7 @@ function updatePublicSpace(publicspace, success = undefined) {
 function createPublicSpace(req, space, optionsOverride, success = undefined) {
 
 	// get domain name to restrict initial space
-	ciscospark.people.list({
+	webexteams.people.list({
 		id: req.body.actorId
 	})
 	.then(function(person){
@@ -2069,16 +2069,16 @@ function membershipsCacheJob(job) {
 
 	// initial call to get members from spcae
 	if (job.type === "space")
-		promise = ciscospark.memberships.list({roomId: job.spaceId});
+		promise = webexteams.memberships.list({roomId: job.spaceId});
 
 	// a job to handle paging of results from first call to memeberships
 	else if (job.type === "next")
 		promise = job.data.next();
 
-	// promise for call to spark api
+	// promise for call to teams api
 	promise
 
-	// call to spark api was successful
+	// call to teams api was successful
 	.then(function(memberships){
 
 		// iteraite through the memberships and add to cache
@@ -2101,7 +2101,7 @@ function membershipsCacheJob(job) {
 
 	})
 
-	// call to spark api failed
+	// call to teams api failed
 	.catch(function(err){
 
 		// hit rate-limiting
@@ -2123,7 +2123,7 @@ function membershipsCacheJob(job) {
 
 		// error that we won't try to recover from
 		else
-			log.error('spark api error while doing memberships cache job', err);
+			log.error('teams api error while doing memberships cache job', err);
 
 		// job is considered complete 
 		completeJob(jobs.cache.memberships, job);
@@ -2254,7 +2254,7 @@ var init = function() {
 
 }
 
-// global function to get bot details from spark
+// global function to get bot details from teams
 var getBotDetails = function() {
 
 	// options for api call
@@ -2263,7 +2263,7 @@ var getBotDetails = function() {
 		path: '/v1/people/me',
 		method: 'GET',
 		headers: {
-			'Authorization': 'Bearer '+process.env.CISCOSPARK_ACCESS_TOKEN
+			'Authorization': 'Bearer '+process.env.WEBEXTEAMS_ACCESS_TOKEN
 		}
 	};
 
@@ -2294,7 +2294,7 @@ var getBotDetails = function() {
 
 	// if there's an error with api call
 	req.on('error', function(e) {
-		log.error("Couldn't get details for bot from Spark");
+		log.error("Couldn't get details for bot from Teams");
 	});
 
 	// end the request

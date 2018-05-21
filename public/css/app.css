@@ -52,7 +52,7 @@ body {
 	position: absolute;
 	z-index: 0;
 	opacity: 0.17;
-	/* background-image: url('../img/logo.png'); uses bot avatar from spark account automatically */
+	/* background-image: url('../img/logo.png'); uses bot avatar from teams account automatically */
 	background-repeat: no-repeat;
 	background-position: 30% 0;
 	-ms-background-size: 200% 200%;
