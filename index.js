@@ -18,8 +18,8 @@ if (!process.env.BASE_URL) {
 	process.exit(1);
 }
 
-if (!process.env.WEBEXTEAMS_ACCESS_TOKEN) {
-	console.log('Error: Specify a Webex Teams access token in environment as "WEBEXTEAMS_ACCESS_TOKEN".');
+if (!process.env.CISCOSPARK_ACCESS_TOKEN) {
+	console.log('Error: Specify a Webex Teams access token in environment as "CISCOSPARK_ACCESS_TOKEN".');
 	process.exit(1);
 }
 
@@ -189,7 +189,7 @@ sessionStore.on('error', function(error) {
 // create middleware for sessions
 const sessionMiddleware = session({
 	store: sessionStore,
-	secret: crypto.createHash('sha256').update(process.env.WEBEXTEAMS_ACCESS_TOKEN).digest('base64'),
+	secret: crypto.createHash('sha256').update(process.env.CISCOSPARK_ACCESS_TOKEN).digest('base64'),
 	resave: false,
 	saveUninitialized: true,
 	name: 'sid',
@@ -2263,7 +2263,7 @@ var getBotDetails = function() {
 		path: '/v1/people/me',
 		method: 'GET',
 		headers: {
-			'Authorization': 'Bearer '+process.env.WEBEXTEAMS_ACCESS_TOKEN
+			'Authorization': 'Bearer '+process.env.CISCOSPARK_ACCESS_TOKEN
 		}
 	};
 

@@ -34,7 +34,8 @@ BASE_URL=https://<hostname>/<path>
 MONGO_URI=mongodb://localhost/publicspaces-webexteams
 
 #The access token for the Cisco Webex Teams bot [required]
-WEBEXTEAMS_ACCESS_TOKEN=
+#Note: The ciscospark package requires this env variable to be set. That package hasn't changed naming to Webex Teams yet.
+CISCOSPARK_ACCESS_TOKEN=
 
 #The Cisco Webex Teams Space ID (roomId) that will have errors posted. Required to test existance of accounts in Cisco Webex Teams [optional]
 #WEBEXTEAMS_ADMIN_SPACE_ID=
