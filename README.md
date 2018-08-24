@@ -12,7 +12,7 @@ $ npm install
 
 After it's installed you need to configure it.
 
-Configruation
+Configuration
 ------------
 
 Some environment variables must be set for this to work. You can create a .env file or set environment variables based on the details below.
