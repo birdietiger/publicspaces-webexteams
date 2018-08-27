@@ -367,7 +367,7 @@ app.get('/api/spaces', function(req, res){
 	}
 
 	// get domain for user
-	var personDomain = req.session.email.split("@")[1];
+	var personDomain = req.session.email.split("@")[1].toLowerCase();
 
 	// search db for spaces that are listed
 	Publicspace.find({
@@ -693,7 +693,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 		// space is internal and user is not in domain
 		else if (
 			publicspace.internal
-			&& publicspace.internalDomains.indexOf(email.split('@')[1]) === -1
+			&& publicspace.internalDomains.indexOf(email.split('@')[1].toLowerCase()) === -1
 			) {
 			log.error(email+' not in internal space domains', publicspace.internalDomains);
 			res.json({ responseCode: 13 });
@@ -981,7 +981,7 @@ app.post('/api/webhooks', function(req, res){
 		var response;
 
 		// get domain for message sender
-		var personDomain = req.body.data.personEmail.split("@")[1];
+		var personDomain = req.body.data.personEmail.split("@")[1].toLowerCase();
 
 		/*
 		// get the details of the message
@@ -1966,7 +1966,7 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 	.then(function(person){
 
 		// get domain for user
-		var personDomain = person.items[0].emails[0].split("@")[1];
+		var personDomain = person.items[0].emails[0].split("@")[1].toLowerCase();
 
 		// get new shortid
 		var shortId = ShortId.generate();
