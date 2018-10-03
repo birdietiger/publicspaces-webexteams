@@ -879,6 +879,12 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 	req.body = JSON.parse(req.body);
 	log.debug('webhook body: ', req.body);
 
+	// if webhook has status of disabled, ignore it
+	if (req.body.status == 'disabled') {
+		log.error('invalid webhook: status is disabled');
+		return;
+	}
+
 	// if the event is a message to the bot and not created by the bot, get details
 	if (
 		req.body.resource == 'messages'
