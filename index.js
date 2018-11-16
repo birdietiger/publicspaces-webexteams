@@ -480,10 +480,19 @@ app.get('/api/auth/:email', function(req, res){
 
 		})
 
-		// failed to call teams api
+		// failure from teams api
 		.catch(function(err){
-			handleErr(err);
-			res.json({ responseCode: 11 });
+		
+			// domain is dir sync'd and email is not teams enabled
+			if (err.body.message == "Failed to find user with specified email address.")
+				res.json({ responseCode: 12 });
+
+			// unknown error
+			else {
+				handleErr(err);
+				res.json({ responseCode: 11 });
+			}
+
 		});
 
 	}
@@ -498,37 +507,9 @@ app.get('/api/auth/:email', function(req, res){
 
 	}
 
-	// if admin space is not defined we can't test email is enabled for teams 
-	else if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
+	// send validation message
+	else
 		sendValidation();
-
-	else {
-
-		// check if email is part of dir synced domain but email is not teams enabled
-		webexteams.memberships.list({
-			roomId: process.env.WEBEXTEAMS_ADMIN_SPACE_ID,
-			personEmail: email
-		})
-
-		// no errors means email is valid
-		.then(function(memberships){
-			sendValidation();
-		})
-
-		// failure
-		.catch(function(err){
-
-			// domain is dir sync'd and email is not teams enabled
-			if (err.body.message == "Failed to find user with specified email address.")
-				res.json({ responseCode: 12 });
-
-			// some other failure
-			else
-				res.json({ responseCode: 11 });
-
-		});
-
-	}
 
 });
 
@@ -548,37 +529,8 @@ app.get('/api/email/:email', function(req, res){
 
 	}
 
-	// if admin space is not defined we can't test email is enabled for teams 
-	else if (!process.env.WEBEXTEAMS_ADMIN_SPACE_ID)
-		res.json({ responseCode: 0 });
-
-	else {
-
-		// check if email is part of dir synced domain but email is not teams enabled
-		webexteams.memberships.list({
-			roomId: process.env.WEBEXTEAMS_ADMIN_SPACE_ID,
-			personEmail: email
-		})
-
-		// no errors means email is valid
-		.then(function(memberships){
-			res.json({ responseCode: 0 });
-		})
-
-		// failure
-		.catch(function(err){
-
-			// domain is dir sync'd and email is not teams enabled
-			if (err.body.message == "Failed to find user with specified email address.")
-				res.json({ responseCode: 12 });
-
-			// some other failure
-			else
-				res.json({ responseCode: 11 });
-
-		});
-
-	}
+	// everything looks ok
+	res.json({ responseCode: 0 });
 
 });
 
@@ -730,7 +682,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				.then(function(people){
 
 					// new teams user
-					if (!people.items.length === 0)
+					if (people.items.length === 0)
 						addUser(spaceId, email);
 
 					// user exists
@@ -819,10 +771,17 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					})
 					.catch(function(err){
 
-						// failed to add user to space
 						handleErr(err);
-						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'couldnt add user to space', err);
+
+						// domain is dir sync'd and email is not teams enabled
+						if (err.body.message.indexOf("not found") > -1)
+							res.json({ responseCode: 12 });
+
+						// failed to add user to space
+						else {
+							res.json({ responseCode: 6 });
+							alertAdminSpace(req, 6, 'couldnt add user to space', err);
+						}
 
 					});
 
@@ -1764,7 +1723,7 @@ app.post('/api/webhooks', function(req, res){
 function handleErr(err, respond = false, spaceId = "", mesg = "") {
 
 	// log err
-	log.error(mesg, err);
+	log.error(mesg, err.toString());
 
 	// send message to end user
 	if (

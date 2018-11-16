@@ -193,9 +193,9 @@ function checkInstalled(state) {
 		joinSpace(shortId);
 	else {
 		if (state == true)
-			$('#message').html("Follow the link in the message you just got in Webex Teams to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
 		else {
-			$('#message').html("Follow the link in the message you just got in Webex Teams to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
 			if (navigator.userAgent.match(/(ip(od|hone|ad))/i))
 				teamsUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			else if (navigator.userAgent.match(/android/i))
@@ -355,6 +355,7 @@ function handleBotResults(data) {
 			break;
 		case 1:
 			eraseCookie(emailCookie);
+			$('#emailContainer').hide();
 			$('#message').html("Invalid email");
 			paintEmailInput();
 			break;
@@ -366,6 +367,7 @@ function handleBotResults(data) {
 			break;
 		case 3:
 			eraseCookie(emailCookie);
+			$('#emailContainer').hide();
 			$('#message').html("Invalid email");
 			paintEmailInput();
 			break;
@@ -411,6 +413,14 @@ function handleBotResults(data) {
 			var message = "URL is no longer active";
 			$('#message').html(message);
 			$('#input').html('');
+			break;
+		case 12:
+			eraseCookie(emailCookie);
+			$('#emailContainer').hide();
+			var message = "Email is not Webex Teams enabled. Contact your IT administrator.";
+			$('#message').html(message);
+			$('#input').html('');
+			paintEmailInput();
 			break;
 		case 13:
 			$('#title').html('');
