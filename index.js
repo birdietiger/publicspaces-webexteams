@@ -136,6 +136,12 @@ var log = new (winston.Logger)({
 	transports: logTransports
 });
 
+// status codes from memberships list that need to be handled differently or just ignored
+membershipsIgnoreStatusCode = [
+	404,
+	500
+	];
+
 // define db schema 
 const Publicspace = require('./models/publicspace');
 
@@ -402,7 +408,10 @@ app.get('/api/spaces', function(req, res){
 
 				// check if user is member of the space
 				var member = false;
-				if (cache.memberships[req.session.email].includes(publicspace.shortId))
+				if (
+					typeof(cache.memberships[req.session.email]) !== "undefined"
+					&& cache.memberships[req.session.email].includes(publicspace.shortId)
+					)
 					member = true;
 
 				// gather all necessary space data
@@ -411,6 +420,7 @@ app.get('/api/spaces', function(req, res){
 					member: member,
 					created: publicspace.created,
 					updated: publicspace.updated,
+					internal: publicspace.internal,
 					title: publicspace.title,
 					hits: publicspace.hits
 				};
@@ -674,32 +684,35 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 
 			})
 			.catch(function(err){
+				log.error("ERROR: Code=" + err.statusCode + "; Email=" + email + "; spaceId=" + spaceId);
+				if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
+					addUser(spaceId, email);
+				else {
+					// check if its an existing teams user
+					webexteams.people.list({
+						email: email
+					})
+					.then(function(people){
 
-				// check if its an existing teams user
-				webexteams.people.list({
-					email: email
-				})
-				.then(function(people){
+						// new teams user
+						if (people.items.length === 0)
+							addUser(spaceId, email);
 
-					// new teams user
-					if (people.items.length === 0)
-						addUser(spaceId, email);
+						// user exists
+						else {
+							res.json({ responseCode: 6 });
+							alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
+						}
 
-					// user exists
-					else {
+					})
+					.catch(function(err){
+
+						handleErr(err);
 						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
-					}
-
-				})
-				.catch(function(err){
-
-					handleErr(err);
-					res.json({ responseCode: 6 });
-					alertAdminSpace(req, 6, 'couldnt get person details', err);
+						alertAdminSpace(req, 6, 'couldnt get person details', err);
 				
-				});
-
+					});
+				}
 			});
 
 		}
@@ -723,6 +736,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				// bot isn't a member
 				if (memberships.items.length === 0) {
 					res.json({ responseCode: 6 });
+					log.info("bot not in space", memberships);
 					alertAdminSpace(req, 6, 'bot not in space', spaceId);
 				}
 
@@ -790,10 +804,20 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			})
 			.catch(function(err){
 
-				// couldn't get membership for bot
-				handleErr(err);
-				res.json({ responseCode: 6 });
-				alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
+					if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1) {
+
+						res.json({ responseCode: 6 });
+						log.info("bot not in space", err);
+						alertAdminSpace(req, 6, 'bot not in space', spaceId);
+
+					} else {
+
+						// couldn't get membership for bot
+						handleErr(err);
+						res.json({ responseCode: 6 });
+						alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
+
+					}
 
 			});
 
@@ -899,7 +923,10 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 
 				// couldn't get membership details
 				.catch(function(err){
-					handleErr(err, true, "personId="+req.body.data.personId+" roomId="+req.body.data.roomId, "couldn't get membership details");
+					if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
+						handleErr({}, false, {}, "bot not in space so can't send message");
+					else
+						handleErr(err, true, "personId="+req.body.data.personId+" roomId="+req.body.data.roomId, "couldn't get membership details");
 				});
 
 			})
@@ -1101,8 +1128,11 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// don't show space externally
-			// TODO command to add/remove domains considered internal
 			else if (message.text.match(/\binternal\b/i)) {
+
+				var internalDomains = [
+					personDomain
+					];
 
 				// check if permitted to issue this command
 				if (
@@ -1115,6 +1145,14 @@ app.post('/api/webhooks', function(req, res){
 					return;
 
 				}
+
+				// get list of optional domains from command
+				var domains = message.text.match(/\binternal\b\s*([^\s].*)$/i);
+				if (
+					domains !== null
+					&& domains[1].trim() !== ""
+					)
+					var internalDomains = domains[1].trim().toLowerCase().split(/\s+/);
 
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
@@ -1133,7 +1171,7 @@ app.post('/api/webhooks', function(req, res){
 						.then(function(space) {
 
 							// make it public
-							createPublicSpace(req, space, { internal: true, internalDomains: [ personDomain ] });
+							createPublicSpace(req, space, { internal: true, internalDomains: internalDomains });
 
 						})
 
@@ -1149,7 +1187,7 @@ app.post('/api/webhooks', function(req, res){
 
 						// set it so its restricted to internal
 						publicspace.internal = true;
-						publicspace.internalDomains = [ personDomain ];
+						publicspace.internalDomains = internalDomains;
 
 						// update db
 						updatePublicSpace(publicspace);
@@ -1790,7 +1828,7 @@ function sendHelpGroup(publicspace) {
 		"**`url`** - Get details on how someone can join this space<br>\n"+
 		"**`list`** - Anyone can see this space listed at "+process.env.BASE_URL+"<br>\n"+
 		"**`list off`** - Remove this space from public listing at "+process.env.BASE_URL+"<br>\n"+
-		"**`internal`** - Only users from your domain can join this space<br>\n"+
+		"**`internal [opt. list of domains]`** - Only users from specific domains can join this space<br>\n"+
 		"**`internal off`** - Anyone can join this space<br>\n"+
 		"**`qr`** - Get QR code to join this space<br>\n"+
 		"**`source`** - Get the link to the source code for this bot<br>\n"+
@@ -1851,7 +1889,7 @@ function sendJoinDetails(publicspace, options = {}) {
 			var files = [];
 
 			if (publicspace.internal)
-				who = "Only users in the domain **"+publicspace.internalDomains[0]+"**";
+				who = "Only users in the domain(s) **"+publicspace.internalDomains.join(", ")+"**";
 
 			if (publicspace.list)
 				listed = " or by finding it listed at "+process.env.BASE_URL;
@@ -1884,7 +1922,10 @@ function sendJoinDetails(publicspace, options = {}) {
 
 	// failed to get membership
 	.catch(function(err){
-		handleErr(err);
+		if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
+			handleErr({}, false, {}, "bot not in space so can't send message");
+		else
+			handleErr(err);
 	});
 
 }

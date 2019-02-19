@@ -11,6 +11,13 @@
 .space {
 	display: flow-root;
 	font-size: 18px;
+	word-break: break-word;
+}
+
+.space:after {
+  content: "";
+  display: table;
+  clear: both;
 }
 
 .btn:focus, .btn-email:focus, .btn-installed:focus, .btn-success:focus {
@@ -107,6 +114,21 @@ body {
 	color: #ffffff;
 	background-color: #0096D6;
 	border: none;
+}
+
+.btn-internal-off {
+	color: #333;
+	background-color: #e6e6e6;
+	border-color: #adadad;
+}
+
+.btn-internal-on,
+.btn-internal-on:hover,
+.btn-internal-on:focus,
+.btn-internal-on:active,
+.btn-internal-on.active {
+	color: #ffffff;
+	background-color: #0096D6;
 }
 
 .btn-installed {

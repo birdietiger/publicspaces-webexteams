@@ -5,6 +5,8 @@ var emailCookie = 'publicspacesEmail';
 var installedCookie = 'publicspacesInstalled';
 var sidCookie = 'sid';
 var email = readCookie(emailCookie);
+var internalOnly = false;
+var domain;
 var installed = readCookie(installedCookie);
 var shortId;
 var spaceTitle;
@@ -18,6 +20,7 @@ String.prototype.truncString = function(max, add){
 function getSpaces(callback) {
 	$.ajax({
 		method: 'GET',
+		cache: false,
 		url: './api/spaces',
 		dataType: 'JSON'
 	})
@@ -105,6 +108,7 @@ function paintSpacesList(spaces) {
 		var spaceHtml = $("#spaceTemplate").html()
 			.replace("%URL%", "./#"+space.shortId)
 			.replace("%TEXT%", space.title.truncString(60))
+			.replace("%INTERNAL%", space.internal)
 			.replace("%HITS%", hits);
 
 		if (space.member) {
@@ -140,6 +144,7 @@ function checkShortId() {
 		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
 		$.ajax({
 			method: 'GET',
+			cache: false,
 			url: './api/shortid/'+shortId,
 			dataType: 'JSON'
 		})
@@ -220,6 +225,7 @@ function checkEmail() {
 	$.ajax({
 		url : url,
 		type: "GET",
+		cache: false,
 		dataType: 'JSON'
 	})
 	.done(function(data){
@@ -258,9 +264,11 @@ function checkEmail() {
 	});
 }
 
-function searchSpaces(searchText) {
+function searchSpaces(searchText, internalOnlyState) {
 	$('.space').each(function(){
 		var show = $(this).find('.space-title').text().toLowerCase().indexOf(searchText.toLowerCase()) !== -1;
+		if (internalOnlyState && $(this).hasClass('internal-false'))
+			show = false;
 		$(this).toggle(show);
 		if ($('#spaceListJoined .space:visible').length === 0)
 			$('#joinedLabel').hide();
@@ -269,10 +277,26 @@ function searchSpaces(searchText) {
 	}); 
 }
 
+function internalOnlyFilter(state) {
+	$('.space.internal-false').each(function(){
+		$(this).toggle();
+	});
+}
+
 function paintSearchInput() {
-	$('#input').html($('#searchInputTemplate').html());
+	$('#input').html(
+		$('#searchInputTemplate').html()
+			//.replace("%DOMAIN%", domain)
+	);
+	$('#internalFilter').on('click', function() {
+		$(this)
+			.toggleClass("btn-internal-on")
+			.toggleClass("btn-internal-off");
+		internalOnly = !internalOnly;
+		searchSpaces($('#searchInput').val(), internalOnly);
+	});
 	$('#searchInput').on('keyup', function(){
-		searchSpaces($(this).val());
+		searchSpaces($(this).val(), internalOnly);
 	});
 	$('#searchInput').focus();
 	if (
@@ -466,12 +490,14 @@ function setEmail() {
 	if (email !== null) {
 		$('#email').html(email);
 		$('#emailContainer').show();
+		domain = email.split('@')[1];
 	}
 }
 
 function cleanSidCookie() {
 	$.ajax({
 		method: 'GET',
+		cache: false,
 		url: './api/auth/clean',
 	})
 	.done(function(response) {

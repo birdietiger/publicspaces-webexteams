@@ -65,13 +65,15 @@
 </div>
 
 <div id="spaceTemplate" class="hidden">
-	<a class="space list-group-item %DISABLED%" href="%URL%"><span class="space-title">%TEXT%</span>%HITS%</a>
+	<a class="space list-group-item %DISABLED% internal-%INTERNAL%" href="%URL%"><span class="space-title">%TEXT%</span>%HITS%</a>
 </div>
 
 <div id="searchInputTemplate" class="hidden">
 	<div class="input-group input-group-lg">
 		<input id="searchInput" type="text" class="form-control form-control-lg" placeholder="Search spaces to join...">
-		<span class="input-group-addon"><i class="fa fa-search"></i></span>
+		<span class="input-group-btn">
+			<button class="btn btn-default btn-internal-off" id="internalFilter" type="button"><i class="fa fa-sitemap"></i></button>
+		</span>
 	</div>
 </div>
 
