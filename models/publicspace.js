@@ -9,7 +9,10 @@ const Schema = mongoose.Schema;
 // create a schema
 const publicspaceSchema = new Schema({
 	spaceId: String,
+	teamId: String,
 	title: String,
+	description: String,
+	logoUrl: String,
 	isLocked: Boolean,
 	shortId: String,
 	active: Boolean,

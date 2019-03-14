@@ -571,16 +571,12 @@ app.get('/api/shortid/:shortId', function(req, res){
 		// things look good
 		} else {
 
-			// set title in case space title is empty... rare case
-			var title = 'Unknown';
-
 			// get space details
 			webexteams.rooms.get(publicspace.spaceId)
 			.then(function(space) {
 
 				// found space
-				title = space.title;
-				res.json({ responseCode: 0, title: title });
+				res.json({ responseCode: 0, title: space.title, logoUrl: publicspace.logoUrl, description: publicspace.description });
 
 			})
 			.catch(function(err){
@@ -1152,7 +1148,7 @@ app.post('/api/webhooks', function(req, res){
 					domains !== null
 					&& domains[1].trim() !== ""
 					)
-					var internalDomains = domains[1].trim().toLowerCase().split(/\s+/);
+					var internalDomains = domains[1].replace(/(^\[|\]$)/g,'').trim().toLowerCase().split(/[,\s]+/);
 
 				// get the space details from the db
 				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
@@ -1191,6 +1187,328 @@ app.post('/api/webhooks', function(req, res){
 
 						// update db
 						updatePublicSpace(publicspace);
+
+					}
+
+				});
+
+			}
+
+			// disable description for space
+			else if (message.text.match(/\bdescription\s+off\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space);
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// set description to nothing
+						publicspace.description = '';
+
+						// update db
+						updatePublicSpace(publicspace, function(){
+							
+							// let user know the description has been set to nothing
+							response = "I won't use a description for this space";
+							sendResponse(message.roomId, response);
+
+						});
+
+					}
+
+				});
+
+			}
+
+			// set description for space
+			else if (message.text.match(/\bdescription\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// parse the description command they sent
+				var description = "";
+				var descriptionCmd = message.html.match(/\bdescription\b\s*(.+)?$/i);
+				if (
+					message.text.match(/\bdescription\b\s*$/) === null
+					&& descriptionCmd !== null
+					&& descriptionCmd[1].trim() !== ""
+					)
+					description = descriptionCmd[1].replace(/(^\[|\]$)/g,'').trim();
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space, { description: description });
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// update the description if provided
+						if (description !== "") {
+
+							// set description
+							publicspace.description = description;
+
+							// update db
+							updatePublicSpace(publicspace, function(){
+							
+								// let user know the description has been set
+								response = "I'll use that description for this space. Make sure it looks ok at ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")";
+								sendResponse(message.roomId, response);
+
+							});
+
+						}
+
+						// checking description setting
+						else {
+
+							// let user know what the description is set to
+							if (publicspace.description)
+								response = "I'm using this description for this space: "+publicspace.description;
+							else
+								response = "I'm not using a description for this space";
+							sendResponse(message.roomId, response);
+
+						}
+
+					}
+
+				});
+
+			}
+
+			// disable logo for space
+			else if (message.text.match(/\blogo\s+off\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space);
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// set logo to nothing
+						publicspace.logoUrl = '';
+
+						// update db
+						updatePublicSpace(publicspace, function(){
+							
+							// let user know the logo has been set to nothing
+							response = "I'll use my avatar for this space";
+							sendResponse(message.roomId, response);
+
+						});
+
+					}
+
+				});
+
+			}
+
+			// set logo for space
+			else if (message.text.match(/\blogo\b/i)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// parse the logo command they sent
+				var logoUrl = "";
+				var logoCmd = message.text.match(/\blogo\b\s*([^\b]+)?$/i);
+				if (
+					message.text.match(/\blogo\b\s*$/) === null
+					&& logoCmd !== null
+					&& logoCmd[1].trim() !== ""
+					) {
+
+					// they provided a url
+					if (logoCmd[1].trim().match(/^http[s]?:\/\//i))
+						logoUrl = logoCmd[1].replace(/(^\[|\]$)/g,'').trim();
+
+					// tell the user they didn't give a url
+					else {
+						response = "You didn't provide a valid url";
+						sendResponse(message.roomId, response);
+						return;
+					}
+
+				}
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space, { logoUrl: logoUrl });
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// update the logo if a url was provided
+						if (logoUrl !== "") {
+
+							// set logo
+							publicspace.logoUrl = logoUrl;
+
+							// update db
+							updatePublicSpace(publicspace, function(){
+							
+								// let user know the logo has been set
+								response = "I'll use that logo for this space. Make sure it looks ok at ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")";
+								sendResponse(message.roomId, response);
+
+							});
+
+						}
+
+						// checking logo setting
+						else {
+
+							// let user know what the logo is set to
+							if (publicspace.logoUrl)
+								response = "I'm using this logo for this space: "+publicspace.logoUrl;
+							else
+								response = "I'm using my avatar as the logo for this space";
+							sendResponse(message.roomId, response);
+
+						}
 
 					}
 
@@ -1826,11 +2144,15 @@ function sendHelpGroup(publicspace) {
 	var markdown = 
 		"@mention me with one of the following commands<br>\n\n"+
 		"**`url`** - Get details on how someone can join this space<br>\n"+
+		"**`qr`** - Get QR code to join this space<br>\n"+
 		"**`list`** - Anyone can see this space listed at "+process.env.BASE_URL+"<br>\n"+
 		"**`list off`** - Remove this space from public listing at "+process.env.BASE_URL+"<br>\n"+
 		"**`internal [opt. list of domains]`** - Only users from specific domains can join this space<br>\n"+
 		"**`internal off`** - Anyone can join this space<br>\n"+
-		"**`qr`** - Get QR code to join this space<br>\n"+
+		"**`logo [opt. url]`** - See or set custom logo (transparent png, 50px width recommended) <br>\n"+
+		"**`logo off`** - Remove custom logo<br>\n"+
+		"**`description [opt. text or markdown]`** - See or set description<br>\n"+
+		"**`description off`** - Remove description<br>\n"+
 		"**`source`** - Get the link to the source code for this bot<br>\n"+
 		supportMarkdown+
 		"**`help`** - List commands<br>\n"+

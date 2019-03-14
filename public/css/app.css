@@ -101,9 +101,13 @@ body {
 	margin: 0;
 }
 
+#description {
+	display: none;
+}
+
 #logo {
-	border-radius: 50%;
-	width: 25px;
+	max-width: 50px;
+	max-height: 50px;
 }
 
 #message {
@@ -174,10 +178,11 @@ body {
 
 .inner {
 	padding: 30px;
+	padding-bottom: 60px;
 }
 
 .inner h4 {
-	padding-bottom: 30px;
+	padding-top: 30px;
 }
 
 .glyphicon-link {

@@ -86,6 +86,8 @@ function paintSpacesList(spaces) {
 	
 	$("#message").html('');
 	$('#title').html('');
+	$('#description').html('');
+	setLogo(botAvatar, botName+' ('+botEmail+')', true);
 
 	if (Object.keys(spaces).length === 0)
 		return;
@@ -135,13 +137,18 @@ function paintSpacesList(spaces) {
 function checkShortId() {
 	var hash = window.location.hash;
 	shortId = decodeURIComponent(hash.substring(1, hash.length));
-	var icon, message;
+	var message;
 	$('#title').html('');
+	$('#description').html('');
 	if (shortId == '') {
 		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
+		setLogo(botAvatar, botName+' ('+botEmail+')', true);
 		getSpaces(paintSpacesList);
 	} else {
 		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
+		var logoUrl = botAvatar;
+		var logoTitle = botName+' ('+botEmail+')';
+		var logoRounded = true;
 		$.ajax({
 			method: 'GET',
 			cache: false,
@@ -151,40 +158,44 @@ function checkShortId() {
 		.done(function(data) {
 			if (data.responseCode == 1) {
 				message = "Invalid URL";
-				$('#title').html(message);//'<span><i class="fa '+icon+'"></i> '+message+'</span>');
-				return;
+				$('#title').html(message);
 			} else if (data.responseCode == 2) {
 				$('#input').html('');
 				$('#message').html('');
 				message = "URL is no longer active";
-				$('#title').html(message);//'<span><i class="fa '+icon+'"></i> '+message+'</span>');
-				return;
+				$('#title').html(message);
 			} else if (data.responseCode == 11) {
 				$('#input').html('');
 				$('#message').html('');
 				message = "We've hit an error. Please retry.";
-				$('#title').html(message);//'<span><i class="fa '+icon+'"></i> '+message+'</span>');
-				return;
+				$('#title').html(message);
 			} else {
 				spaceTitle = data.title;
+				spaceDescription = data.description;
 				$('#title').html(spaceTitle);
+				if (spaceDescription)
+					$('#description').html(spaceDescription.replace(/onclick=\"[^\"]*\"/, '')).show();
+				if (data.logoUrl) {
+					logoUrl = data.logoUrl;
+					logoTitle = '';
+					logoRounded = false;
+				}
+				if (email !== null && (installed !== null && installed == 'true')) {
+					joinSpace(shortId);
+				} else if (email !== null && (installed == null || installed == 'false')) {
+					$('#input').html($('#installedInputTemplate').html());
+				} else {
+					paintEmailInput();
+				}
 			}
-			if (email !== null && (installed !== null && installed == 'true')) {
-				joinSpace(shortId);
-			} else if (email !== null && (installed == null || installed == 'false')) {
-				$('#input').html($('#installedInputTemplate').html());
-			} else {
-				paintEmailInput();
-			}
+			setLogo(logoUrl, logoTitle, logoRounded);
 		})
 		.fail(function() {
 			message = "Oops. Something went wrong.";
-			//icon = "fa-exclamation-circle";
-			$('#title').html(message);//'<span><i class="fa '+icon+'"></i> '+message+'</span>');
-			return;
+			$('#title').html(message);
 		})
 		.always(function() {
-			//alert( "complete" );
+			//
 		});
 	}
 }
@@ -286,7 +297,6 @@ function internalOnlyFilter(state) {
 function paintSearchInput() {
 	$('#input').html(
 		$('#searchInputTemplate').html()
-			//.replace("%DOMAIN%", domain)
 	);
 	$('#internalFilter').on('click', function() {
 		$(this)
@@ -360,7 +370,7 @@ function handleBotResults(data) {
 			}
 		}
 	}
-	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location = './'\">Discover More Spaces</button>";
+	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location.hash = ''\">Discover More Spaces</button>";
 	if (teamsUrl !== null) {
 		var successText;
 		if (installed == 'true') successText = 'Open Webex Teams';
@@ -448,6 +458,8 @@ function handleBotResults(data) {
 			break;
 		case 13:
 			$('#title').html('');
+			$('#description').html('');
+			setLogo(botAvatar, botName+' ('+botEmail+')', true);
 			setEmail();
 			var message = "Not permitted to Webex Teams space";
 			$('#message').html(message);
@@ -511,11 +523,16 @@ function cleanSidCookie() {
 	});
 }
 
+function setLogo(logoUrl, logoTitle, rounded) {
+	var borderRadius = "50%";
+	if (!rounded)
+		borderRadius = "0";
+	$('#logo').attr('src', logoUrl).attr('title', logoTitle).css('border-radius', borderRadius);
+	$('<style>.site-wrapper:before{background-image:url('+logoUrl+')}</style>').appendTo('head');
+}
+
 function setup() {
-	$('#logo').attr('src', botAvatar);
-	$('#logo').attr('title', botName+' ('+botEmail+')');
 	document.title = botName+' | Join Webex Teams Spaces';
-	$('<style>.site-wrapper:before{background-image:url('+botAvatar+')}</style>').appendTo('head');
 	if (supportEmail != '') {
 		$('#support').show();
 		var supportSubject = 'Question about joining Webex Teams Space via '+botName+' ('+botEmail+')';
@@ -540,6 +557,8 @@ function setup() {
 		$('#message').html('');
 		$('#input').html('');
 		$('#title').html('');
+		$('#description').html('');
+		setLogo(botAvatar, botName+' ('+botEmail+')', true);
 		$('#list').html('');
 		checkShortId();
 	});
