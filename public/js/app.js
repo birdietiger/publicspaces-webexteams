@@ -174,7 +174,7 @@ function checkShortId() {
 				spaceDescription = data.description;
 				$('#title').html(spaceTitle);
 				if (spaceDescription)
-					$('#description').html(spaceDescription.replace(/onclick=\"[^\"]*\"/, '')).show();
+					$('#description').html(spaceDescription.replace(/onclick=\"[^\"]*\"/, ''));
 				if (data.logoUrl) {
 					logoUrl = data.logoUrl;
 					logoTitle = '';
