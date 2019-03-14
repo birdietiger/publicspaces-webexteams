@@ -109,7 +109,7 @@ function paintSpacesList(spaces) {
 
 		var spaceHtml = $("#spaceTemplate").html()
 			.replace("%URL%", "./#"+space.shortId)
-			.replace("%TEXT%", space.title.truncString(60))
+			.replace("%TEXT%", space.title.truncString(55))
 			.replace("%INTERNAL%", space.internal)
 			.replace("%HITS%", hits);
 
@@ -370,7 +370,7 @@ function handleBotResults(data) {
 			}
 		}
 	}
-	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default' onClick=\"window.location.hash = ''\">Discover More Spaces</button>";
+	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default btn-discover' onClick=\"window.location.hash = ''\">Discover More Spaces</button>";
 	if (teamsUrl !== null) {
 		var successText;
 		if (installed == 'true') successText = 'Open Webex Teams';
