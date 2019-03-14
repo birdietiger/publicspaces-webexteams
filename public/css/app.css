@@ -3,6 +3,12 @@
 	color: darkorange;
 }
 
+#internal-label {
+	font-size: .5em;
+	float: left;
+	margin-top: -4px;
+}
+
 #spaceLists {
 	margin-top: 20px;
 	text-align: left;
