@@ -114,8 +114,9 @@ body {
 }
 
 #logo {
-	max-width: 50px;
-	max-height: 50px;
+	max-width: 100px;
+	max-height: 100px;
+	margin-bottom: 20px;
 }
 
 #message {
@@ -242,7 +243,7 @@ body {
 
 @media (min-device-height: 766px) and (orientation:landscape) {
 	.main-container {
-		margin-top: 200px;
+		margin-top: 100px;
 	}
 }
 
