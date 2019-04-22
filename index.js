@@ -56,16 +56,28 @@ if (!process.env.SOURCE_URL)
 else
 	sourceUrl = process.env.SUPPORT_EMAIL;
 
+var permitDomains = [];
+if (!process.env.PERMIT_DOMAINS)
+	console.log('Warn: If you want to limit supported domains, set PERMIT_DOMAINS in environment.');
+else
+	permitDomains = process.env.PERMIT_DOMAINS.toLowerCase().split(/\ *,\ */);
+
+var description = '';
+if (!process.env.DESCRIPTION)
+	console.log('Warn: If you want a description used on the listing page and help message set DESCRIPTION in environment.');
+else
+	description = process.env.DESCRIPTION;
+
 var supportEmail = '';
 if (!process.env.SUPPORT_EMAIL)
-	console.log('Warn: You should have a support email set in environment as "SUPPORT_EMAIL" so users can get contact you.');
+	console.log('Warn: You should have a support email set in environment as "SUPPORT_EMAIL" so users can contact you.');
 else
 	supportEmail = process.env.SUPPORT_EMAIL;
 
 if (!process.env.ADMIN_PORT)
-	console.log('Warn: admin apis are disabled. Specify a TCP port to use in environment as "ADMIN_PORT" to enable them.');
+	console.log('Warn: Admin apis are disabled. Specify a TCP port to use in environment as "ADMIN_PORT" to enable them.');
 else
-	console.log('Info: admin apis are enabled on port '+process.env.ADMIN_PORT);
+	console.log('Info: Admin apis are enabled on port '+process.env.ADMIN_PORT);
 
 if (!process.env.PORT)
 	console.log('Warn: Specify a TCP port to use in environment as "PORT" or default port of 3000 will be used.');
@@ -262,6 +274,7 @@ app.get('/js/config.js', function(req, res){
 	res.charset = "UTF-8";
 	var javascriptConfig = `
 		var supportEmail = "`+supportEmail+`";
+		var description = "`+description+`";
 		var botAvatar = "`+botDetails.avatar+`";
 		var botName = "`+botDetails.displayName+`";
 		var botEmail = "`+botDetails.emails[0]+`";
@@ -373,7 +386,7 @@ app.get('/api/spaces', function(req, res){
 	}
 
 	// get domain for user
-	var personDomain = req.session.email.split("@")[1].toLowerCase();
+	var personDomain = getEmailDomain(req.session.email);
 
 	// search db for spaces that are listed
 	Publicspace.find({
@@ -452,6 +465,13 @@ app.get('/api/auth/:email', function(req, res){
 	// get email from url
 	var email = req.params.email;
 
+	// check if domain is permitted
+	if (!isDomainPermitted(email)) {
+		log.info('email auth: domain not permitted: "'+email+'"');
+		res.json({ responseCode: 11 });
+		return;
+	}
+
 	// error if session doesn't have a temp password set
 	if (!req.session.tempPwd) {
 		log.error('email auth: no tempPwd set: "'+email+'"');
@@ -528,6 +548,13 @@ app.get('/api/email/:email', function(req, res){
 
 	// get email from url
 	var email = req.params.email;
+
+	// check if domain is permitted
+	if (!isDomainPermitted(email)) {
+		log.info('email check: domain not permitted: "'+email+'"');
+		res.json({ responseCode: 3 });
+		return;
+	}
 
 	// is it RFC compliant email?
 	if (!validator.isEmail(email)) {
@@ -613,16 +640,25 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 	// email from body
 	var email = req.body.email;
 
+	// check if domain is permitted
+	if (!isDomainPermitted(email)) {
+		log.info('add to space: domain not permitted: "'+email+'"');
+		res.json({ responseCode: 3 });
+		return;
+	}
+
 	// check for email
 	if (!email) {
 		log.error('add to space: missing email');
 		res.json({ responseCode: 3 });
+		return;
 	}
 
 	// valid email
 	if (!validator.isEmail(email)) {
 		log.error('add to space: invalid email: "'+email+'"');
 		res.json({ responseCode: 3 });
+		return;
 	}
 
 	// get db entry for shortid
@@ -864,12 +900,32 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 		return;
 	}
 
-	// if the event is a message to the bot and not created by the bot, get details
+	// there was a change to membership to a space for a user other than the bot
 	if (
+		req.body.resource == 'memberships'
+		&& req.body.data.personEmail.toLowerCase() != botDetails.emails[0].toLowerCase()
+		) {
+
+		// check if domain is permitted
+		if (!isDomainPermitted(req.body.data.personEmail)) {
+			log.info('invalid webhook: domain not permitted: "'+req.body.data.personEmail+'"');
+			return;
+		}
+
+	}
+
+	// if the event is a message to the bot and not created by the bot, get details
+	else if (
 		req.body.resource == 'messages'
 		&& req.body.event == 'created'
-		&& req.body.data.personEmail != botDetails.emails[0]
+		&& req.body.data.personEmail.toLowerCase() != botDetails.emails[0].toLowerCase()
 		) {
+
+		// check if domain is permitted
+		if (!isDomainPermitted(req.body.data.personEmail)) {
+			log.info('invalid webhook: domain not permitted: "'+req.body.data.personEmail+'"');
+			return;
+		}
 
 		// get the details of the message
 		webexteams.messages.get(req.body.data.id)
@@ -902,7 +958,7 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 
 					// bot not a member
 					if (memberships.items.length === 0)
-						handleErr({}, false, {}, "bot not in space so can't send message");
+						handleErr(memberships.items, false, {}, "messageCreateNotBot: bot not in space so can't send message");
 
 					// bot is a member
 					else {
@@ -920,7 +976,7 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 				// couldn't get membership details
 				.catch(function(err){
 					if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
-						handleErr({}, false, {}, "bot not in space so can't send message");
+						handleErr(err, false, {}, "messageCreateNotBot: bot not in space so can't send message");
 					else
 						handleErr(err, true, "personId="+req.body.data.personId+" roomId="+req.body.data.roomId, "couldn't get membership details");
 				});
@@ -969,7 +1025,7 @@ app.post('/api/webhooks', function(req, res){
 		var response;
 
 		// get domain for message sender
-		var personDomain = req.body.data.personEmail.split("@")[1].toLowerCase();
+		var personDomain = getEmailDomain(req.body.data.personEmail);
 
 		/*
 		// get the details of the message
@@ -1037,7 +1093,10 @@ app.post('/api/webhooks', function(req, res){
 							var toJoin = [];
 							var joined = [];
 							publicspaces.forEach(function(publicspace){
-								if (cache.memberships[message.personEmail.toLowerCase()].includes(publicspace.shortId))
+								if (
+									cache.memberships[message.personEmail.toLowerCase()]
+									&& cache.memberships[message.personEmail.toLowerCase()].includes(publicspace.shortId)
+									)
 									joined.push("> ["+publicspace.title+"]("+process.env.BASE_URL+'#'+publicspace.shortId+")<br>\n");
 								else
 									toJoin.push("> ["+publicspace.title+"]("+process.env.BASE_URL+'#'+publicspace.shortId+")<br>\n");
@@ -2075,6 +2134,29 @@ app.post('/api/webhooks', function(req, res){
 
 });
 
+// global function to check if email domain is permitted
+function isDomainPermitted(email = "") {
+
+	// no permitted domains set
+	if (!permitDomains.length)
+		return true;
+
+	// permitted domains are set. default to not permitted
+	var permitted = false;
+
+	// domain is in permitted domains
+	if (permitDomains.indexOf(getEmailDomain(email)) !== -1)
+		permitted = true;
+
+	return permitted;
+
+}
+
+// global function to get email domain
+function getEmailDomain(email = "") {
+	return email.trim().split("@")[1].toLowerCase();
+}
+
 // global function to handle err
 function handleErr(err, respond = false, spaceId = "", mesg = "") {
 
@@ -2138,17 +2220,21 @@ function sendHelpDirect(spaceId) {
 
 // global function to send help
 function sendHelpGroup(publicspace) {
-	var supportMarkdown = '';
+	var supportMarkdown = '', internalMarkdown = '', descriptionMarkdown = '';
 	if (process.env.WEBEXTEAMS_SUPPORT_SPACE_ID)
 		supportMarkdown = "**`support`** - Join the support space for this bot<br>\n";
+	if (!process.env.PERMIT_DOMAINS)
+		internalMarkdown = "**`internal [opt. list of domains]`** - Only users from specific domains can join this space<br>\n" + "**`internal off`** - Anyone can join this space<br>\n";
+	if (process.env.DESCRIPTION)
+		descriptionMarkdown = description + "\n\n";
 	var markdown = 
+		descriptionMarkdown+
 		"@mention me with one of the following commands<br>\n\n"+
 		"**`url`** - Get details on how someone can join this space<br>\n"+
 		"**`qr`** - Get QR code to join this space<br>\n"+
 		"**`list`** - Anyone can see this space listed at "+process.env.BASE_URL+"<br>\n"+
 		"**`list off`** - Remove this space from public listing at "+process.env.BASE_URL+"<br>\n"+
-		"**`internal [opt. list of domains]`** - Only users from specific domains can join this space<br>\n"+
-		"**`internal off`** - Anyone can join this space<br>\n"+
+		internalMarkdown+
 		"**`logo [opt. url]`** - See or set custom logo (transparent png, 50px width recommended) <br>\n"+
 		"**`logo off`** - Remove custom logo<br>\n"+
 		"**`description [opt. text or markdown]`** - See or set description<br>\n"+
@@ -2201,7 +2287,7 @@ function sendJoinDetails(publicspace, options = {}) {
 
 		// bot not a member
 		if (memberships.items.length === 0)
-			handleErr({}, false, {}, "bot not in space so can't send message");
+			handleErr(memberships.items, false, {}, "sendJoinDetails: bot not in space so can't send message");
 
 		// bot is a member
 		else {
@@ -2245,7 +2331,7 @@ function sendJoinDetails(publicspace, options = {}) {
 	// failed to get membership
 	.catch(function(err){
 		if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
-			handleErr({}, false, {}, "bot not in space so can't send message");
+			handleErr(err, false, {}, "sendJoinDetails: bot not in space so can't send message");
 		else
 			handleErr(err);
 	});
@@ -2294,7 +2380,7 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 	.then(function(person){
 
 		// get domain for user
-		var personDomain = person.items[0].emails[0].split("@")[1].toLowerCase();
+		var personDomain = getEmailDomain(person.items[0].emails[0]);
 
 		// get new shortid
 		var shortId = ShortId.generate();
@@ -2411,7 +2497,14 @@ function membershipsCacheJob(job) {
 
 		// iteraite through the memberships and add to cache
 		memberships.items.forEach(function(membership){
-			addCache(cache.memberships, membership.personEmail.toLowerCase(), job.shortId);
+
+			// check if email domain is permitted before adding to cache
+			if (
+				membership.personEmail
+				&& isDomainPermitted(membership.personEmail)
+				)
+				addCache(cache.memberships, membership.personEmail.toLowerCase(), job.shortId);
+
 		});
 
 		// there are more memberships to get for this space, so add a new job to the queue

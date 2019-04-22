@@ -142,6 +142,7 @@ function checkShortId() {
 	$('#description').html('');
 	if (shortId == '') {
 		$('#title').html("<i class='fa fa-sync fa-spin'></i>");
+		$('#description').html(description);
 		setLogo(botAvatar, botName+' ('+botEmail+')', true);
 		getSpaces(paintSpacesList);
 	} else {
