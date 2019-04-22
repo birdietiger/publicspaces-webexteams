@@ -55,6 +55,12 @@ CISCOSPARK_ACCESS_TOKEN=
 #The Cisco Webex Teams Space ID (roomId) that users can join to get support [optional]
 #WEBEXTEAMS_SUPPORT_SPACE_ID=
 
+#Restrict the user domains the bot will respond to and add to spaces. If set, disables "internal" setting in spaces [optional]
+#PERMIT_DOMAINS=
+
+#Set description used for website listing and messaging help [optional]
+#DESCRIPTION=
+
 #Allows users of website to request support via email [optional]
 #SUPPORT_EMAIL=
 
