@@ -754,112 +754,103 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 	// put email in a space or request membership
 	function addUser(spaceId, email) {
 
-		// get space details to determine if its currently locked
-		webexteams.rooms.get(spaceId)
-		.then(function(space){
+		// try to add user to space even though it could fail to avoid excessive API calls
+		webexteams.memberships.create({
+			roomId: spaceId,
+			personEmail: email
+		})
+		.then(function(membership) {
 
-			// check to see if bot is a member of the space
-			webexteams.memberships.list({
-				roomId: spaceId,
-				personEmail: botDetails.emails[0]
-			})
-			.then(function(memberships) {
-
-				// bot isn't a member
-				if (memberships.items.length === 0) {
-					res.json({ responseCode: 6 });
-					log.info("bot not in space", memberships);
-					alertAdminSpace(req, 6, 'bot not in space', spaceId);
-				}
-
-				// if the space is locked and the bot isn't a mod
-				else if (
-					space.isLocked
-					&& !memberships.items[0].isModerator
-					) {
-
-					// message the space that the user is requesting access
-					webexteams.messages.create({
-						roomId: spaceId,
-						markdown: email+' would like to join this space'
-					})
-					.then(function(space) {
-
-						// sent message to space
-						res.json({ responseCode: 9 });
-
-					})
-					.catch(function(err){
-
-						// failed to send message to space
-						handleErr(err);
-						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'couldnt send message to locked space to add user', err);
-
-					});
-
-				}
-
-				// space isn't locked or its locked and bot is mod
-				else {
-
-					// add user to space
-					webexteams.memberships.create({
-						roomId: spaceId,
-						personEmail: email
-					})
-					.then(function(membership) {
-
-						// was able to add user
-						log.info("added user to space", membership.id);
-						res.json({ responseCode: 0, spaceId: spaceId });
-
-					})
-					.catch(function(err){
-
-						handleErr(err);
-
-						// domain is dir sync'd and email is not teams enabled
-						if (err.body.message.indexOf("not found") > -1)
-							res.json({ responseCode: 12 });
-
-						// failed to add user to space
-						else {
-							res.json({ responseCode: 6 });
-							alertAdminSpace(req, 6, 'couldnt add user to space', err);
-						}
-
-					});
-
-				}
-
-			})
-			.catch(function(err){
-
-					if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1) {
-
-						res.json({ responseCode: 6 });
-						log.info("bot not in space", err);
-						alertAdminSpace(req, 6, 'bot not in space', spaceId);
-
-					} else {
-
-						// couldn't get membership for bot
-						handleErr(err);
-						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
-
-					}
-
-			});
+			// was able to add user
+			log.info("added user to space", membership.id);
+			res.json({ responseCode: 0, spaceId: spaceId });
 
 		})
 		.catch(function(err){
 
-			// couldn't get details on space
+			// couldn't add user, but it might be ok. will check below
 			handleErr(err);
-			res.json({ responseCode: 6 });
-			alertAdminSpace(req, 6, 'couldnt get space details', err);
+
+			// domain is dir sync'd and email is not teams enabled
+			if (err.body.message.indexOf("not found") > -1) {
+				res.json({ responseCode: 12 });
+				return;
+			}
+
+			// get space details to determine if its currently locked
+			webexteams.rooms.get(spaceId)
+			.then(function(space){
+
+				// check to see if bot is a member of the space
+				webexteams.memberships.list({
+					roomId: spaceId,
+					personEmail: botDetails.emails[0]
+				})
+				.then(function(memberships){
+
+					// if the space is locked and the bot isn't a mod
+					if (
+						space.isLocked
+						&& !memberships.items[0].isModerator
+						) {
+
+						// message the space that the user is requesting access
+						webexteams.messages.create({
+							roomId: spaceId,
+							markdown: email+' would like to join this space'
+						})
+						.then(function(space) {
+
+							// sent message to space
+							res.json({ responseCode: 9 });
+
+						})
+						.catch(function(err){
+
+							// failed to send message to space
+							handleErr(err);
+							res.json({ responseCode: 6 });
+							alertAdminSpace(req, 6, 'couldnt send message to locked space to add user', err);
+
+						});
+
+					}
+
+					// space isn't locked or its locked and bot is mod
+					// no good reason to not be able to add user
+					else {
+						res.json({ responseCode: 6 });
+						alertAdminSpace(req, 6, 'couldnt add user to space', err);
+					}
+
+				})
+				.catch(function(err){
+
+					// couldn't get membership for bot. likely API services failure
+					handleErr(err);
+					res.json({ responseCode: 6 });
+					alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
+
+				});
+
+			})
+			.catch(function(err){
+
+				handleErr(err);
+
+				// very likely the bot isn't in the space
+				if (err.statusCode === 404) {
+					log.info("bot not in space", err);
+					alertAdminSpace(req, 6, 'bot not in space', spaceId);
+				}
+
+				// couldn't get details on space. likely API service failure
+				else
+					alertAdminSpace(req, 6, 'couldnt get space details', err);
+
+				res.json({ responseCode: 6 });
+
+			});
 
 		});
 
@@ -976,7 +967,7 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 				// couldn't get membership details
 				.catch(function(err){
 					if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
-						handleErr(err, false, {}, "messageCreateNotBot: bot not in space so can't send message");
+						handleErr(err+", status: "+err.statusCode, false, {}, "messageCreateNotBot: bot not in space so can't send message");
 					else
 						handleErr(err, true, "personId="+req.body.data.personId+" roomId="+req.body.data.roomId, "couldn't get membership details");
 				});
@@ -1124,7 +1115,7 @@ app.post('/api/webhooks', function(req, res){
 			// rest of checks are for group spaces
 
 			// anyone can join space (default)
-			else if (message.text.match(/\binternal\s+off\b/i)) {
+			else if (commandMatch('internal\\s+off', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1183,7 +1174,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// don't show space externally
-			else if (message.text.match(/\binternal\b/i)) {
+			else if (commandMatch('internal', message.text)) {
 
 				var internalDomains = [
 					personDomain
@@ -1202,7 +1193,7 @@ app.post('/api/webhooks', function(req, res){
 				}
 
 				// get list of optional domains from command
-				var domains = message.text.match(/\binternal\b\s*([^\s].*)$/i);
+				var domains = message.text.match(/internal\b\s*([^\s].*)$/i);
 				if (
 					domains !== null
 					&& domains[1].trim() !== ""
@@ -1254,7 +1245,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// disable description for space
-			else if (message.text.match(/\bdescription\s+off\b/i)) {
+			else if (commandMatch('description\\s+off', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1318,7 +1309,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// set description for space
-			else if (message.text.match(/\bdescription\b/i)) {
+			else if (commandMatch('description', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1334,9 +1325,9 @@ app.post('/api/webhooks', function(req, res){
 
 				// parse the description command they sent
 				var description = "";
-				var descriptionCmd = message.html.match(/\bdescription\b\s*(.+)?$/i);
+				var descriptionCmd = message.html.match(/description\b\s*(.+)?$/i);
 				if (
-					message.text.match(/\bdescription\b\s*$/) === null
+					message.text.match(/description\b\s*$/) === null
 					&& descriptionCmd !== null
 					&& descriptionCmd[1].trim() !== ""
 					)
@@ -1409,7 +1400,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// disable logo for space
-			else if (message.text.match(/\blogo\s+off\b/i)) {
+			else if (commandMatch('logo\\s+off', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1473,7 +1464,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// set logo for space
-			else if (message.text.match(/\blogo\b/i)) {
+			else if (commandMatch('logo', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1489,9 +1480,9 @@ app.post('/api/webhooks', function(req, res){
 
 				// parse the logo command they sent
 				var logoUrl = "";
-				var logoCmd = message.text.match(/\blogo\b\s*([^\b]+)?$/i);
+				var logoCmd = message.text.match(/logo\b\s*([^\b]+)?$/i);
 				if (
-					message.text.match(/\blogo\b\s*$/) === null
+					message.text.match(/logo\b\s*$/) === null
 					&& logoCmd !== null
 					&& logoCmd[1].trim() !== ""
 					) {
@@ -1576,7 +1567,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// don't show space publicly
-			else if (message.text.match(/\blist\s+off\b/i)) {
+			else if (commandMatch('list\\s+off', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1649,7 +1640,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// show space publicly
-			else if (message.text.match(/\blist\b/i)) {
+			else if (commandMatch('list', message.text)) {
 
 				// check if permitted to issue this command
 				if (
@@ -1724,7 +1715,7 @@ app.post('/api/webhooks', function(req, res){
 			// add the user to the support space for this bot if support space id provided
 			else if (
 						process.env.WEBEXTEAMS_SUPPORT_SPACE_ID
-						&& message.text.match(/\bsupport\b/i)
+						&& commandMatch('support', message.text)
 						) {
 
 				// add person to support space
@@ -1755,12 +1746,12 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// send source link
-			else if (message.text.match(/\bsource\b/i)) {
+			else if (commandMatch('source', message.text)) {
 				sendResponse(message.roomId, "You can find the source code for me at " + sourceUrl);
 			}
 
 			// send qr code to space
-			else if (message.text.match(/\bqr\b/i)) {
+			else if (commandMatch('qr', message.text)) {
 
 				// get space from db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -1801,7 +1792,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// get url to join space
-			else if (message.text.match(/\burl\b/i)) {
+			else if (commandMatch('url', message.text)) {
 
 				// get space from db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -2331,9 +2322,9 @@ function sendJoinDetails(publicspace, options = {}) {
 	// failed to get membership
 	.catch(function(err){
 		if (membershipsIgnoreStatusCode.indexOf(err.statusCode) > -1)
-			handleErr(err, false, {}, "sendJoinDetails: bot not in space so can't send message");
+			handleErr(err+", status: "+err.statusCode, false, {}, "sendJoinDetails: bot not in space so can't send message");
 		else
-			handleErr(err);
+			handleErr(err+", status: "+err.statusCode);
 	});
 
 }
@@ -2629,6 +2620,15 @@ function addJob(jobs, job) {
 	// add job to queue
 	jobs.queue.push(job);
 
+}
+
+// check if command was sent
+var commandMatch = function(commandRegExp, messageText) {
+	var botCommandRegExp = new RegExp('('+botDetails.displayName+'|'+botDetails.displayName.split(' ')[0]+'|\\b)'+commandRegExp+'\\b', 'i');
+	if (messageText.match(botCommandRegExp))
+		return true;
+	else
+		return false;
 }
 
 // initialize
