@@ -1399,6 +1399,135 @@ app.post('/api/webhooks', function(req, res){
 
 			}
 
+			// revert to previous shortId for this space
+			else if (commandMatch('url\\s+previous', message.text)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space);
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// save current url and revert to previous shortid
+						var previousShortId = publicspace.shortId;
+						publicspace.shortId = publicspace.previousShortId;
+						publicspace.previousShortId = previousShortId;
+
+						// update db
+						updatePublicSpace(publicspace, function(){
+							
+							// share the new join details
+							sendJoinDetails(publicspace);
+
+						});
+
+					}
+
+				});
+
+			}
+
+			// regenerate a new shortid for this space
+			else if (commandMatch('url\\s+new', message.text)) {
+
+				// check if permitted to issue this command
+				if (
+					req.body.room.isLocked
+					&& !req.body.membership.isModerator
+					) {
+
+					// respond with error and stop processing this command
+					sendPermissionDenied(req.body.room.id);
+					return;
+
+				}
+
+				// get the space details from the db
+				Publicspace.findOne({ 'spaceId': message.roomId}, function (err, publicspace) {
+
+					// couldn't get anything from db
+					if (err)
+						handleErr(err, true, message.roomId, "db err");
+
+					// not found in db
+					else if (!publicspace) {
+
+						// get space details
+						webexteams.rooms.get(message.roomId)
+
+						// found space
+						.then(function(space) {
+
+							// make it public
+							createPublicSpace(req, space);
+
+						})
+
+						// failed to get space details
+						.catch(function(err){
+							handleErr(err, true, message.roomId, "failed to get space details");
+						});
+
+					}
+
+					// found an entry in the db
+					else if (publicspace) {
+
+						// save current shortId and set new shortid
+						publicspace.previousShortId = publicspace.shortId;
+						publicspace.shortId = ShortId.generate();
+
+						// update db
+						updatePublicSpace(publicspace, function(){
+							
+							// share the new join details
+							sendJoinDetails(publicspace);
+
+						});
+
+					}
+
+				});
+
+			}
+
 			// disable logo for space
 			else if (commandMatch('logo\\s+off', message.text)) {
 
@@ -2211,13 +2340,15 @@ function sendHelpDirect(spaceId) {
 
 // global function to send help
 function sendHelpGroup(publicspace) {
-	var supportMarkdown = '', internalMarkdown = '', descriptionMarkdown = '';
+	var supportMarkdown = '', internalMarkdown = '', descriptionMarkdown = '', urlPreviousMarkdown = '';
 	if (process.env.WEBEXTEAMS_SUPPORT_SPACE_ID)
 		supportMarkdown = "**`support`** - Join the support space for this bot<br>\n";
 	if (!process.env.PERMIT_DOMAINS)
 		internalMarkdown = "**`internal [opt. list of domains]`** - Only users from specific domains can join this space<br>\n" + "**`internal off`** - Anyone can join this space<br>\n";
 	if (process.env.DESCRIPTION)
 		descriptionMarkdown = description + "\n\n";
+	if (publicspace.shortId != publicspace.previousShortId)
+		urlPreviousMarkdown = "**`url previous`** - Revert to the previous url to join this space<br>\n";
 	var markdown = 
 		descriptionMarkdown+
 		"@mention me with one of the following commands<br>\n\n"+
@@ -2230,6 +2361,8 @@ function sendHelpGroup(publicspace) {
 		"**`logo off`** - Remove custom logo<br>\n"+
 		"**`description [opt. text or markdown]`** - See or set description<br>\n"+
 		"**`description off`** - Remove description<br>\n"+
+		"**`url new`** - Create a new url to join this space<br>\n"+
+		urlPreviousMarkdown+
 		"**`source`** - Get the link to the source code for this bot<br>\n"+
 		supportMarkdown+
 		"**`help`** - List commands<br>\n"+
@@ -2382,6 +2515,7 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 			isLocked: space.isLocked,
 			title: space.title,
 			shortId: shortId,
+			previousShortId: shortId,
 			active: true,
 			list: false,
 			internal: true,

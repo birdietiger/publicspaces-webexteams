@@ -15,6 +15,7 @@ const publicspaceSchema = new Schema({
 	logoUrl: String,
 	isLocked: Boolean,
 	shortId: String,
+	previousShortId: String,
 	active: Boolean,
 	list: Boolean,
 	internal: Boolean,
