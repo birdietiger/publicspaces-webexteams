@@ -96,6 +96,7 @@ if (logLevels.includes(process.env.LOG_LEVEL))
 console.log('Info: Setting log level to "'+logLevel+'". Set LOG_LEVEL in environment to "error", "warn", "info", "verbose", "debug", or "silly"');
 	
 // required packages
+const assert = require('assert');
 const winston = require('winston');
 const expressWinston = require('express-winston');
 const https = require('https');
