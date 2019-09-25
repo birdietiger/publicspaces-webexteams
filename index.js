@@ -150,10 +150,13 @@ var log = new (winston.Logger)({
 });
 
 // status codes from memberships list that need to be handled differently or just ignored
-membershipsIgnoreStatusCode = [
+var membershipsIgnoreStatusCode = [
 	404,
 	500
 	];
+
+// cookie name for session id
+const cookieSidName = 'sid';
 
 // define db schema 
 const Publicspace = require('./models/publicspace');
@@ -177,10 +180,9 @@ const textParser = new bodyParser.text({
 
 // winston filter for sensitive data
 var expressWinstonReqFilter = function (req, propName) {
-	if (propName == 'headers')
-		return req[propName].cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
-	else
-		return req[propName];
+	if (propName == 'headers' && req[propName].cookie)
+		req[propName].cookie = req[propName].cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
+	return req[propName];
 }
 
 // express-winston logger makes sense BEFORE the router.
@@ -216,7 +218,6 @@ sessionStore.on('error', function(error) {
 });
 
 // create middleware for sessions
-const cookieSidName = 'sid';
 const sessionMiddleware = session({
 	store: sessionStore,
 	secret: crypto.createHash('sha256').update(process.env.CISCOSPARK_ACCESS_TOKEN).digest('base64'),
@@ -2321,7 +2322,8 @@ function alertAdminSpace(req, code, message, err = null) {
 	// get request headers
 	var headers = '<br><br>'+JSON.stringify(function(){
 		var headersFiltered = req.headers;
-		headersFiltered.cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
+		if (headersFiltered.cookie)
+			headersFiltered.cookie = headersFiltered.cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
 		return headersFiltered;
 	})
 
