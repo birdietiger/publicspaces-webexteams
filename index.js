@@ -96,6 +96,7 @@ if (logLevels.includes(process.env.LOG_LEVEL))
 console.log('Info: Setting log level to "'+logLevel+'". Set LOG_LEVEL in environment to "error", "warn", "info", "verbose", "debug", or "silly"');
 	
 // required packages
+const assert = require('assert');
 const winston = require('winston');
 const expressWinston = require('express-winston');
 const https = require('https');
@@ -174,10 +175,19 @@ const textParser = new bodyParser.text({
 	type: '*/*'
 });
 
+// winston filter for sensitive data
+var expressWinstonReqFilter = function (req, propName) {
+	if (propName == 'headers')
+		return req[propName].cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
+	else
+		return req[propName];
+}
+
 // express-winston logger makes sense BEFORE the router.
 app.use(expressWinston.logger({
 	transports: logTransports,
-	statusLevels: logStatusLevels
+	statusLevels: logStatusLevels,
+	requestFilter: expressWinstonReqFilter
 }));
 
 // use the router
@@ -186,7 +196,8 @@ app.use(router);
 // express-winston errorLogger makes sense AFTER the router.
 app.use(expressWinston.errorLogger({
 	transports: logTransports,
-	statusLevels: logStatusLevels
+	statusLevels: logStatusLevels,
+	requestFilter: expressWinstonReqFilter
 }));
 
 // tell Express to serve files from our public folder
@@ -205,12 +216,13 @@ sessionStore.on('error', function(error) {
 });
 
 // create middleware for sessions
+const cookieSidName = 'sid';
 const sessionMiddleware = session({
 	store: sessionStore,
 	secret: crypto.createHash('sha256').update(process.env.CISCOSPARK_ACCESS_TOKEN).digest('base64'),
 	resave: false,
 	saveUninitialized: true,
-	name: 'sid',
+	name: cookieSidName,
 	cookie: {
 		secure: true,
 		httpOnly: false,
@@ -230,12 +242,14 @@ if (process.env.ADMIN_PORT) {
 		adminApp.set('trust proxy', 1);
 	adminApp.use(expressWinston.logger({
 		transports: logTransports,
-		statusLevels: logStatusLevels
+		statusLevels: logStatusLevels,
+		requestFilter: expressWinstonReqFilter
 	}));
 	adminApp.use(router);
 	adminApp.use(expressWinston.errorLogger({
 		transports: logTransports,
-		statusLevels: logStatusLevels
+		statusLevels: logStatusLevels,
+		requestFilter: expressWinstonReqFilter
 	}));
 
 	// return jobs json
@@ -668,14 +682,14 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 		if (err) {
 			handleErr(err);
 			res.json({ responseCode: 4 });
-			alertAdminSpace(req, 4, 'failed to call db', err);
+			alertAdminSpace(req, 4, 'failed to call db; '+email+'; '+shortId, err);
 		}
 
 		// no valid space
 		else if (!publicspace) {
 			log.error('invalid shortId ', shortId);
 			res.json({ responseCode: 4 });
-			alertAdminSpace(req, 4, 'no entry in db', err);
+			alertAdminSpace(req, 4, 'no entry in db; '+email+'; '+shortId, err);
 		}
 
 		// space is not active
@@ -733,7 +747,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 						// user exists
 						else {
 							res.json({ responseCode: 6 });
-							alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore');
+							alertAdminSpace(req, 6, 'person exists, but couldnt add to space. bot might not be in space anymore; '+email+'; '+spaceId);
 						}
 
 					})
@@ -741,7 +755,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 
 						handleErr(err);
 						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'couldnt get person details', err);
+						alertAdminSpace(req, 6, 'couldnt get person details; '+email+'; '+spaceId, err);
 				
 					});
 				}
@@ -810,7 +824,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 							// failed to send message to space
 							handleErr(err);
 							res.json({ responseCode: 6 });
-							alertAdminSpace(req, 6, 'couldnt send message to locked space to add user', err);
+							alertAdminSpace(req, 6, 'couldnt send message to locked space to add user; '+email+'; '+spaceId, err);
 
 						});
 
@@ -820,7 +834,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					// no good reason to not be able to add user
 					else {
 						res.json({ responseCode: 6 });
-						alertAdminSpace(req, 6, 'couldnt add user to space', err);
+						alertAdminSpace(req, 6, 'couldnt add user to space; '+email+'; '+spaceId, err);
 					}
 
 				})
@@ -829,7 +843,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 					// couldn't get membership for bot. likely API services failure
 					handleErr(err);
 					res.json({ responseCode: 6 });
-					alertAdminSpace(req, 6, 'couldnt get bot membership details', err);
+					alertAdminSpace(req, 6, 'couldnt get bot membership details; '+email+'; '+spaceId, err);
 
 				});
 
@@ -841,12 +855,12 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				// very likely the bot isn't in the space
 				if (err.statusCode === 404) {
 					log.info("bot not in space", err);
-					alertAdminSpace(req, 6, 'bot not in space', spaceId);
+					alertAdminSpace(req, 6, 'bot not in space; '+email+'; '+spaceId, spaceId);
 				}
 
 				// couldn't get details on space. likely API service failure
 				else
-					alertAdminSpace(req, 6, 'couldnt get space details', err);
+					alertAdminSpace(req, 6, 'couldnt get space details; '+email+'; '+spaceId, err);
 
 				res.json({ responseCode: 6 });
 
@@ -2305,7 +2319,11 @@ function alertAdminSpace(req, code, message, err = null) {
 	if (err != '') err = '<br><br>'+JSON.stringify(err);
 
 	// get request headers
-	var headers = '<br><br>'+JSON.stringify(req.headers);
+	var headers = '<br><br>'+JSON.stringify(function(){
+		var headersFiltered = req.headers;
+		headersFiltered.cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
+		return headersFiltered;
+	})
 
 	// send message to space
 	webexteams.messages.create({
