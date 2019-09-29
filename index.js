@@ -799,7 +799,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 				// check to see if bot is a member of the space
 				webexteams.memberships.list({
 					roomId: spaceId,
-					personEmail: botDetails.emails[0]
+					personId: botDetails.id
 				})
 				.then(function(memberships){
 
@@ -2320,12 +2320,10 @@ function alertAdminSpace(req, code, message, err = null) {
 	if (err != '') err = '<br><br>'+JSON.stringify(err);
 
 	// get request headers
-	var headers = '<br><br>'+JSON.stringify(function(){
-		var headersFiltered = req.headers;
-		if (headersFiltered.cookie)
-			headersFiltered.cookie = headersFiltered.cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED%');
-		return headersFiltered;
-	})
+	var headers = req.headers;
+	if (headers.cookie)
+		headers.cookie = headers.cookie.replace(RegExp('\('+cookieSidName+'=\)[^;]+'), '$1%REDACTED>');
+	headers = '<br><br>'+JSON.stringify(headers);
 
 	// send message to space
 	webexteams.messages.create({
@@ -2423,7 +2421,7 @@ function sendJoinDetails(publicspace, options = {}) {
 	// check for bot membership in space
 	webexteams.memberships.list({
 		roomId: publicspace.spaceId,
-		personEmail: botDetails.emails[0]
+		personId: botDetails.id
 	})
 
 	// found bot membership
