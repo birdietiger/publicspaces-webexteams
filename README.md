@@ -1,7 +1,5 @@
 # Public Spaces for Cisco Webex Teams
 
-> Cisco Spark is now Webex Teams! You will notice changes to this project to reflect those changes. [Read why this is more than just a rebrand.](https://developer.webex.com/blog/blog-details-9738.html)
-
 Installation
 ------------
 
@@ -19,7 +17,7 @@ Some environment variables must be set for this to work. You can create a .env f
 
 If using a .env file, it must be in the same directory as index.js.
 
-```
+``` bash
 #Specify the port for epxress to listen on [optional; default = 3000]
 #PORT=3000
 
@@ -30,14 +28,14 @@ If using a .env file, it must be in the same directory as index.js.
 #REVERSE_PROXY=true
 
 #This is the URL that users will visit to join spaces [required]
-BASE_URL=https://<hostname>/<path>
+BASE_URL="https://<hostname>/<path>"
 
 #The Mongo DB URI to use to store data on public spaces and sessions [required]
-MONGO_URI=mongodb://localhost/publicspaces-webexteams
+MONGO_URI="mongodb://localhost/publicspaces-webexteams"
 
 #The access token for the Cisco Webex Teams bot [required]
 #Note: The ciscospark package requires this env variable to be set. That package hasn't changed naming to Webex Teams yet.
-CISCOSPARK_ACCESS_TOKEN=
+CISCOSPARK_ACCESS_TOKEN="<provided by https://developer.webex.com/>"
 
 #The Cisco Webex Teams Space ID (roomId) that will have errors posted. Required to test existance of accounts in Cisco Webex Teams [optional]
 #WEBEXTEAMS_ADMIN_SPACE_ID=
@@ -69,17 +67,49 @@ CISCOSPARK_ACCESS_TOKEN=
 
 #Set log level [optional; default = info]
 #"error", "warn", "info", "verbose", "debug", or "silly"
-#LOG_LEVEL=debug
+#LOG_LEVEL="debug"
 ```
 
 Cisco Webex Teams Webhooks
 ------------
 
-For the bot to receive all notifications from Cisco Webex Teams, you must manually create a [webhook](https://developer.webex.com/webhooks-explained.html). 
+For the bot to receive all notifications from Cisco Webex Teams, you must manually create a [webhook](https://developer.webex.com/webhooks-explained.html).
+
+Webhooks are expected at `https://<hostname>/<path>/api/webhooks`. You'll need to use the same secret for all webhooks and set it in the `WEBEXTEAMS_WEBHOOK_SECRET` environment variable.
+
+You'll need to create the following webhooks:
+
+``` json
+{
+  "name": "publicspaces messages:created",
+  "targetUrl": "https://<hostname>/<path>/api/webhooks",
+  "resource": "messages",
+  "event": "created",
+  "secret": "<WEBEXTEAMS_WEBHOOK_SECRET environment variable>"
+}
+```
+
+``` json
+{
+  "name": "publicspaces rooms:updated",
+  "targetUrl": "https://<hostname>/<path>/api/webhooks",
+  "resource": "rooms",
+  "event": "updated",
+  "secret": "<WEBEXTEAMS_WEBHOOK_SECRET environment variable>"
+}
+```
+
+``` json
+{
+  "name": "publicspaces memberships:all",
+  "targetUrl": "https://<hostname>/<path>/api/webhooks",
+  "resource": "memberships",
+  "event": "all",
+  "secret": "<WEBEXTEAMS_WEBHOOK_SECRET environment variable>"
+}
+```
 
 It's probably easiest to use the Cisco Webex Teams developer [API docs](https://developer.webex.com/endpoint-webhooks-post.html).
-
-Webhooks are expected at `https://<hostname>/<path>/api/webhooks`.
 
 Cisco Webex Teams Webhooks require https, so take a look at the Reverse Web Proxy section.
 

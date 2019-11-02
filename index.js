@@ -4,8 +4,16 @@
 // add integration (oauth) support to have user login
 
 // setup env var
-const env = require('node-env-file');
-env(__dirname + '/.env');
+const fs = require('fs');
+const envFile = __dirname + '/.env';
+try {
+	if (fs.existsSync(envFile)) {
+		const env = require('node-env-file');
+		env(path);
+	}
+} catch(err) {
+	console.log('Info: No .env file found. Assuming environment variables are already set.')
+}
 
 // check for env vars
 if (!process.env.MONGO_URI) {
@@ -36,7 +44,7 @@ if (
 }
 */
 
-if (!process.env.REVERSE_PROXY)
+if (!process.env.REVERSE_PROXY.toLowerCase() == 'true')
 	console.log('Warn: Assuming app is not behind a reverse proxy. If it is, set "REVERSE_PROXY=true" in environment and add "X-Forwarded-Proto" to request header in the proxy.');
 else
 	console.log('Warn: Make sure that your reverse proxy is set to rewrite the cookie path correctly.');
