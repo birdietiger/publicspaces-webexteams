@@ -109,6 +109,18 @@ You'll need to create the following webhooks:
 }
 ```
 
+Alternatively, you could create a firehose webhook.
+
+``` json
+{
+  "name": "publicspaces memberships:all",
+  "targetUrl": "https://<hostname>/<path>/api/webhooks",
+  "resource": "all",
+  "event": "all",
+  "secret": "<WEBEXTEAMS_WEBHOOK_SECRET environment variable>"
+}
+```
+
 It's probably easiest to use the Cisco Webex Teams developer [API docs](https://developer.webex.com/endpoint-webhooks-post.html).
 
 Cisco Webex Teams Webhooks require https, so take a look at the Reverse Web Proxy section.
