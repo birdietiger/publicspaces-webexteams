@@ -25,7 +25,7 @@ If using a .env file, it must be in the same directory as index.js.
 #PORT=3001
 
 #If a reverse web proxy is in front of express set to "true" [optional; default = false]
-#REVERSE_PROXY=true
+#REVERSE_PROXY="true"
 
 #This is the URL that users will visit to join spaces [required]
 BASE_URL="https://<hostname>/<path>"
