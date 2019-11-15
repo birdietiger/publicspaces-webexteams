@@ -105,7 +105,7 @@ var logLevel = "info";
 if (logLevels.includes(process.env.LOG_LEVEL))
 	logLevel = process.env.LOG_LEVEL;
 console.log('Info: Setting log level to "'+logLevel+'". Set LOG_LEVEL in environment to "error", "warn", "info", "verbose", "debug", or "silly"');
-	
+
 // required packages
 const assert = require('assert');
 const winston = require('winston');
@@ -122,7 +122,7 @@ const mongoose = require('mongoose').connect(process.env.MONGO_URI);
 const express = require('express');
 const session = require('express-session');
 const mongoDBStore = require('connect-mongodb-session')(session);
- 
+
 // setup logging
 var logTransports = [];
 var logConfig = winston.config;
@@ -169,7 +169,7 @@ var membershipsIgnoreStatusCode = [
 // cookie name for session id
 const cookieSidName = 'sid';
 
-// define db schema 
+// define db schema
 const Publicspace = require('./models/publicspace');
 
 // define express app
@@ -321,7 +321,7 @@ app.get('/auth/:tempPwd', function(req, res){
 		req.session.tempPwd
 		&& req.session.email
 		&& req.session.tempPwd === req.params.tempPwd
-		) { 
+		) {
 
 		// users email
 		var email = req.session.email;
@@ -538,7 +538,7 @@ app.get('/api/auth/:email', function(req, res){
 
 		// failure from teams api
 		.catch(function(err){
-		
+
 			// domain is dir sync'd and email is not teams enabled
 			if (err.body.message == "Failed to find user with specified email address.")
 				res.json({ responseCode: 12 });
@@ -725,7 +725,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 			// space ID that user is trying to join
 			var spaceId = publicspace.spaceId;
 
-			// check if email is in space 
+			// check if email is in space
 			webexteams.memberships.list({
 				roomId: spaceId,
 				personEmail: email
@@ -768,7 +768,7 @@ app.post('/api/shortid/:shortId', jsonParser, function(req, res){
 						handleErr(err);
 						res.json({ responseCode: 6 });
 						alertAdminSpace(req, 6, 'couldnt get person details; '+email+'; '+spaceId, err);
-				
+
 					});
 				}
 			});
@@ -901,13 +901,13 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 	if (process.env.WEBEXTEAMS_WEBHOOK_SECRET) {
 		var hash = crypto.createHmac('sha1', process.env.WEBEXTEAMS_WEBHOOK_SECRET).update(req.body).digest('hex');
 		var teamsHash = req.get('X-Spark-Signature');
-		if (hash !== teamsHash) { 
+		if (hash !== teamsHash) {
 			log.error('invalid webhook: wrong hash');
 			return;
 		}
 	}
 
-	// create objext from body of webhook 
+	// create objext from body of webhook
 	req.body = JSON.parse(req.body);
 	log.debug('webhook body: ', req.body);
 
@@ -1026,7 +1026,7 @@ app.post('/api/webhooks', textParser, function(req, res, next){
 app.post('/api/webhooks', function(req, res){
 
 /*
-	// create objext from body of webhook 
+	// create objext from body of webhook
 	req.body = JSON.parse(req.body);
 	log.debug('webhook body: ', req.body);
 */
@@ -1088,7 +1088,7 @@ app.post('/api/webhooks', function(req, res){
 
 					// find worked
 					else {
-				
+
 						// no spaces found and senthelp
 						if (
 							publicspaces.length === 0
@@ -1321,7 +1321,7 @@ app.post('/api/webhooks', function(req, res){
 
 						// update db
 						updatePublicSpace(publicspace, function(){
-							
+
 							// let user know the description has been set to nothing
 							response = "I won't use a description for this space";
 							sendResponse(message.roomId, response);
@@ -1398,7 +1398,7 @@ app.post('/api/webhooks', function(req, res){
 
 							// update db
 							updatePublicSpace(publicspace, function(){
-							
+
 								// let user know the description has been set
 								response = "I'll use that description for this space. Make sure it looks ok at ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")";
 								sendResponse(message.roomId, response);
@@ -1478,7 +1478,7 @@ app.post('/api/webhooks', function(req, res){
 
 						// update db
 						updatePublicSpace(publicspace, function(){
-							
+
 							// share the new join details
 							sendJoinDetails(publicspace);
 
@@ -1542,7 +1542,7 @@ app.post('/api/webhooks', function(req, res){
 
 						// update db
 						updatePublicSpace(publicspace, function(){
-							
+
 							// share the new join details
 							sendJoinDetails(publicspace);
 
@@ -1605,7 +1605,7 @@ app.post('/api/webhooks', function(req, res){
 
 						// update db
 						updatePublicSpace(publicspace, function(){
-							
+
 							// let user know the logo has been set to nothing
 							response = "I'll use my avatar for this space";
 							sendResponse(message.roomId, response);
@@ -1694,7 +1694,7 @@ app.post('/api/webhooks', function(req, res){
 
 							// update db
 							updatePublicSpace(publicspace, function(){
-							
+
 								// let user know the logo has been set
 								response = "I'll use that logo for this space. Make sure it looks ok at ["+process.env.BASE_URL+"#"+publicspace.shortId+"]("+process.env.BASE_URL+"#"+publicspace.shortId+")";
 								sendResponse(message.roomId, response);
@@ -1776,7 +1776,7 @@ app.post('/api/webhooks', function(req, res){
 					// found the space in the db
 					else if (publicspace) {
 
-						// delist space 
+						// delist space
 						publicspace.list = false;
 
 						// update db
@@ -1914,7 +1914,7 @@ app.post('/api/webhooks', function(req, res){
 					// find from db failed
 					if (err)
 						handleErr(err, true, message.roomId, "db err");
-					
+
 					// not found in db
 					else if (!publicspace) {
 
@@ -1943,7 +1943,7 @@ app.post('/api/webhooks', function(req, res){
 						sendJoinDetails(publicspace, { qr: true });
 
 				});
-	
+
 			}
 
 			// get url to join space
@@ -1955,7 +1955,7 @@ app.post('/api/webhooks', function(req, res){
 					// find from db failed
 					if (err)
 						handleErr(err, true, message.roomId, "db err");
-					
+
 					// not found in db
 					else if (!publicspace) {
 
@@ -1982,11 +1982,11 @@ app.post('/api/webhooks', function(req, res){
 						sendJoinDetails(publicspace);
 
 				});
-	
+
 			}
 
 			// sent help command or didn't recognize the message content/command. send help
-			else { 
+			else {
 
 				// get space from db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -1994,7 +1994,7 @@ app.post('/api/webhooks', function(req, res){
 					// find from db failed
 					if (err)
 						handleErr(err, true, message.roomId, "db err");
-					
+
 					// not found in db
 					else if (!publicspace) {
 
@@ -2054,7 +2054,7 @@ app.post('/api/webhooks', function(req, res){
 			Publicspace.findOne({ 'spaceId': space.id}, function (err, publicspace) {
 
 				// db error
-				if (err) 
+				if (err)
 					handleErr(err, true, space.id, "db failure");
 
 				// space exists in db and something has changed
@@ -2105,7 +2105,7 @@ app.post('/api/webhooks', function(req, res){
 		Publicspace.findOne({ 'spaceId': spaceId }, function (err, publicspace) {
 
 			// db error
-			if (err) 
+			if (err)
 				handleErr(err, false, '', "db failure");
 
 			// db call was successful
@@ -2179,14 +2179,14 @@ app.post('/api/webhooks', function(req, res){
 						if (space.type == 'group') {
 
 							// make it public
-							createPublicSpace(req, space); 
+							createPublicSpace(req, space);
 
 							// add to one job to membership cache
 							addJob(jobs.cache.memberships, {
 								spaceId: space.id,
 								type: "space"
 							});
-							
+
 						}
 
 					})
@@ -2214,7 +2214,7 @@ app.post('/api/webhooks', function(req, res){
 					publicspace.save(function (err, data) {
 
 						// failed to save
-						if (err) 
+						if (err)
 							handleErr(err, false, "", "db failure");
 
 						// updated db
@@ -2378,7 +2378,7 @@ function sendHelpGroup(publicspace) {
 		descriptionMarkdown = description + "\n\n";
 	if (publicspace.shortId != publicspace.previousShortId)
 		urlPreviousMarkdown = "**`url previous`** - Revert to the previous url to join this space<br>\n";
-	var markdown = 
+	var markdown =
 		descriptionMarkdown+
 		"@mention me with one of the following commands<br>\n\n"+
 		"**`url`** - Get details on how someone can join this space<br>\n"+
@@ -2564,7 +2564,7 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 		publicspace.save(function (err, data) {
 
 			// failed to create db entry
-			if (err) 
+			if (err)
 				handleErr(err, true, space.id, "failed to create db entry");
 
 			// created new space entry
@@ -2616,7 +2616,7 @@ function removeCache(cache, key, value = null) {
 
 }
 
-// add an entry to the cache 
+// add an entry to the cache
 function addCache(cache, key, value) {
 
 	// if a key isn't in the cache, add them
@@ -2700,7 +2700,7 @@ function membershipsCacheJob(job) {
 		else
 			log.error('teams api error while doing memberships cache job', err);
 
-		// job is considered complete 
+		// job is considered complete
 		completeJob(jobs.cache.memberships, job);
 
 	});
@@ -2842,7 +2842,7 @@ var init = function() {
 var getBotDetails = function() {
 
 	// options for api call
-	var options = { 
+	var options = {
 		hostname: 'api.ciscospark.com',
 		path: '/v1/people/me',
 		method: 'GET',
@@ -2858,7 +2858,7 @@ var getBotDetails = function() {
 		var results = '';
 		res.on('data', function (chunk) {
 			results = results + chunk;
-		}); 
+		});
 
 		// when all chunks have been read
 		res.on('end', function () {
@@ -2872,7 +2872,7 @@ var getBotDetails = function() {
 				log.info("Bot details updated: ", botDetails);
 			}
 
-		}); 
+		});
 
 	});
 
