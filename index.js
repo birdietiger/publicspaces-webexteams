@@ -44,7 +44,10 @@ if (
 }
 */
 
-if (!process.env.REVERSE_PROXY.toLowerCase() == 'true')
+if (
+	!process.env.REVERSE_PROXY
+	|| process.env.REVERSE_PROXY.toLowerCase() != 'true'
+	)
 	console.log('Warn: Assuming app is not behind a reverse proxy. If it is, set "REVERSE_PROXY=true" in environment and add "X-Forwarded-Proto" to request header in the proxy.');
 else
 	console.log('Warn: Make sure that your reverse proxy is set to rewrite the cookie path correctly.');
