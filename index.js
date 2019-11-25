@@ -631,6 +631,39 @@ app.get('/api/shortid/:shortId', function(req, res){
 				// found space
 				res.json({ responseCode: 0, title: space.title, logoUrl: publicspace.logoUrl, description: publicspace.description });
 
+				// update db with any differences in space details
+				if (
+					publicspace.title !== space.title
+					|| publicspace.isLocked !== space.isLocked
+					|| (
+							typeof(space.teamId) !== 'undefined'
+							&& publicspace.teamId !== space.teamId
+						)
+					|| (
+							typeof(space.teamId) === 'undefined'
+							&& publicspace.teamId !== ''
+						)
+					) {
+
+					// set title and isLocked in db
+					publicspace.title = space.title;
+					publicspace.isLocked = space.isLocked;
+
+					// set teamId in db
+					if (typeof(space.teamId) !== 'undefined')
+						publicspace.teamId = space.teamId;
+
+					// remove teamId from db
+					else
+						publicspace.teamId = '';
+
+					// silently update db
+					updatePublicSpace(publicspace, function(){
+						// do nothing
+					});
+
+				}
+
 			})
 			.catch(function(err){
 
@@ -2061,10 +2094,26 @@ app.post('/api/webhooks', function(req, res){
 				else if (
 					publicspace.isLocked !== space.isLocked
 					|| publicspace.title !== space.title
+					|| (
+							typeof(space.teamId) !== 'undefined'
+							&& publicspace.teamId !== space.teamId
+						)
+					|| (
+							typeof(space.teamId) === 'undefined'
+							&& publicspace.teamId !== ''
+						)
 					) {
 
 					// set title in db
 					publicspace.title = space.title;
+
+					// set teamId in db
+					if (typeof(space.teamId) !== 'undefined')
+						publicspace.teamId = space.teamId;
+
+					// remove teamId from db
+					else
+						publicspace.teamId = '';
 
 					// space locked status hasn't changed so be silent in update as title doesn't matter
 					if (publicspace.isLocked === space.isLocked)
@@ -2541,6 +2590,7 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 		// set default options
 		var defaultOptions = {
 			spaceId: space.id,
+			teamId: '',
 			isLocked: space.isLocked,
 			title: space.title,
 			shortId: shortId,
@@ -2553,6 +2603,10 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 			created: new Date(),
 			updated: new Date()
 			};
+
+		// if space is in a team, set teamId
+		if (typeof(space.teamId) !== "undefined")
+			defaultOptions.teamId = space.teamId;
 
 		// override default options
 		var options = Object.assign({}, defaultOptions, optionsOverride);
