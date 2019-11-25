@@ -35,7 +35,7 @@ function getSpaces(callback) {
 		}
 		else if (response.responseCode === -1) {
 			$('#title').html('Discover More Spaces');
-			$('#message').html("You must verify your email via a Webex Teams message.");
+			$('#message').html("You must verify your identity via a Webex Teams message.");
 			paintEmailInput();
 		}
 	})
@@ -210,9 +210,9 @@ function checkInstalled(state) {
 		joinSpace(shortId);
 	else {
 		if (state == true)
-			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your identity.");
 		else {
-			$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
+			$('#message').html("Follow the link in the Webex Teams message you just got to verify your identity.");
 			if (navigator.userAgent.match(/(ip(od|hone|ad))/i))
 				teamsUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			else if (navigator.userAgent.match(/android/i))
@@ -251,7 +251,7 @@ function checkEmail() {
 					if (shortId != '')
 						joinSpace(shortId);
 					else
-						$('#message').html("Follow the link in the Webex Teams message you just got to verify your email.");
+						$('#message').html("Follow the link in the Webex Teams message you just got to verify your identity.");
 				} else {
 					$('#input').html($('#installedInputTemplate').html());
 				}
@@ -521,6 +521,7 @@ function cleanSidCookie() {
 	})
 	.always(function() {
 		eraseCookie(sidCookie);
+		checkShortId();
 	});
 }
 
@@ -548,10 +549,9 @@ function setup() {
 		email = null;
 		installed = null;
 		eraseCookie(emailCookie);
-		cleanSidCookie();
 		eraseCookie(installedCookie);
 		$("#emailContainer").hide();
-		checkShortId();
+		cleanSidCookie();
 	});
 	$(window).bind( 'hashchange', function() {
 		$("#message").show();
