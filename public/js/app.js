@@ -83,7 +83,7 @@ function paintSpacesList(spaces) {
 
 	if (typeof spaces === "undefined")
 		spaces = {};
-	
+
 	$("#message").html('');
 	$('#title').html('');
 	$('#description').html('');
@@ -286,7 +286,7 @@ function searchSpaces(searchText, internalOnlyState) {
 			$('#joinedLabel').hide();
 		else
 			$('#joinedLabel').show();
-	}); 
+	});
 }
 
 function internalOnlyFilter(state) {
@@ -352,23 +352,19 @@ function handleBotResults(data) {
 	var spaceId = data.spaceId;
 	if (spaceId !== undefined) {
 		if (navigator.userAgent.match(/(ip(od|hone|ad))/i)) {
-			if (installed == 'true') {
-				teamsUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
-			} else {
+			if (installed != 'true') {
 				teamsUrl = "itms-apps://itunes.apple.com/us/app/project-squared/id833967564?ls=1&mt=8";
 			}
 		} else if (navigator.userAgent.match(/android/i)) {
-			if (installed == 'true') {
-				teamsUrl = "spark://rooms/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
-			} else {
+			if (installed != 'true') {
 				teamsUrl = "https://play.google.com/store/apps/details?id=com.cisco.wx2.android";
 			}
 		} else {
-			if (installed == 'true') {
-				teamsUrl = "https://teams.webex.com/spaces/"+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
-			} else {
+			if (installed != 'true') {
 				teamsUrl = "https://www.webex.com/downloads.html";
-			}
+			} else {
+        teamsUrl = "webexteams://im?space="+Base64.decode(spaceId).replace(/^.*\/([^\/]+)$/, "$1");
+      }
 		}
 	}
 	var discoverButtonHtml = "<button class='btn btn-lg btn-block btn-default btn-discover' onClick=\"window.location.hash = ''\">Discover More Spaces</button>";
@@ -483,7 +479,7 @@ function joinSpace(shortId) {
 		type: "POST",
 		contentType: "application/json; charset=utf-8",
 		data : JSON.stringify({
-			email: email 
+			email: email
 		}),
 		dataType: 'JSON'
 	})
