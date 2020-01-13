@@ -1,6 +1,21 @@
-.fire {
-	background: none;
+#spaceListJoin .list-group-item {
+	background: #fff;
+}
+
+.list-group-item .badge.fire {
 	color: darkorange;
+	background: none;
+	margin-right: 0;
+	padding-right: 3px;
+	padding-left: 3px;
+}
+
+.list-group-item .badge.external {
+	color: #ccc;
+	background: none;
+	margin-right: 0;
+	padding-right: 3px;
+	padding-left: 3px;
 }
 
 #internal-label {
@@ -17,7 +32,7 @@
 .space {
 	font-weight: 300;
 	display: flow-root;
-	font-size: 18px;
+	font-size: 15px;
 	word-break: break-word;
 }
 
@@ -196,7 +211,7 @@ body {
 }
 
 .inner {
-	padding: 30px;
+	padding: 15px;
 	padding-bottom: 60px;
 }
 

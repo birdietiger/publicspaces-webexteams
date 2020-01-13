@@ -5,7 +5,7 @@ var emailCookie = 'publicspacesEmail';
 var installedCookie = 'publicspacesInstalled';
 var sidCookie = 'sid';
 var email = readCookie(emailCookie);
-var internalOnly = false;
+var internalOnly = true;
 var domain;
 var installed = readCookie(installedCookie);
 var shortId;
@@ -107,10 +107,15 @@ function paintSpacesList(spaces) {
 		if (percentRank(hitsArray, space.hits) >= .66)
 			hits = '<span class="badge badge-default badge-pill fire"><i class="fa fa-fire"></i></span>';
 
+		var external = '';
+		if (!space.internal)
+			external = '<span class="badge badge-default badge-pill external"><i class="fa fa-globe"></i></span>';
+
 		var spaceHtml = $("#spaceTemplate").html()
 			.replace("%URL%", "./#"+space.shortId)
 			.replace("%TEXT%", space.title.truncString(55))
 			.replace("%INTERNAL%", space.internal)
+			.replace("%EXTERNAL%", external)
 			.replace("%HITS%", hits);
 
 		if (space.member) {
@@ -316,6 +321,7 @@ function paintSearchInput() {
 		) {
 		$('#searchInput').val(_get['search']);
 	}
+	searchSpaces($('#searchInput').val(), internalOnly);
 }
 
 function paintEmailInput() {
