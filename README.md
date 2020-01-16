@@ -113,7 +113,7 @@ Alternatively, you could create a firehose webhook.
 
 ``` json
 {
-  "name": "publicspaces memberships:all",
+  "name": "publicspaces all:all",
   "targetUrl": "https://<hostname>/<path>/api/webhooks",
   "resource": "all",
   "event": "all",
