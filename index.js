@@ -9,7 +9,7 @@ const envFile = __dirname + '/.env';
 try {
 	if (fs.existsSync(envFile)) {
 		const env = require('node-env-file');
-		env(path);
+		env(envFile);
 	}
 } catch(err) {
 	console.log('Info: No .env file found. Assuming environment variables are already set.')
