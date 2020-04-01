@@ -11,7 +11,6 @@ var installed = readCookie(installedCookie);
 var shortId;
 var spaceTitle;
 var spaceList;
-var retryResponseCodes = [ 6, 8 ];
 
 String.prototype.truncString = function(max, add){
    add = add || '…';
@@ -479,25 +478,19 @@ function handleBotResults(data) {
 }
 
 function joinSpace(shortId) {
+	//var message = "Adding to Webex Teams space";
 	$('#message').html("<i class='fa fa-sync fa-spin'></i>");
 	$.ajax({
 		url : './api/shortid/'+shortId,
 		type: "POST",
 		contentType: "application/json; charset=utf-8",
-		retries: 2,
 		data : JSON.stringify({
 			email: email
 		}),
 		dataType: 'JSON'
 	})
 	.done(function(data){
-    if (
-      retryResponseCodes.indexOf(data.responseCode) != -1
-      && this.retries-- > 0
-      )
-      $.ajax(this);
-    else
-		  handleBotResults(data);
+		handleBotResults(data);
 	})
 	.fail(function(){
 		var data = { responseCode:'', responseMessage:'' };
