@@ -2022,7 +2022,7 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// sent help command or didn't recognize the message content/command. send help
-			else {
+			else if (commandMatch('', message.text)) {
 
 				// get space from db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
