@@ -1980,7 +1980,10 @@ app.post('/api/webhooks', function(req, res){
 			}
 
 			// get url to join space
-			else if (commandMatch('url', message.text)) {
+			else if (
+				commandMatch('url', message.text)
+				|| commandMatch('$', message.text)
+				) {
 
 				// get space from db
 				Publicspace.findOne({ 'spaceId': message.roomId }, function (err, publicspace) {
@@ -2039,7 +2042,6 @@ app.post('/api/webhooks', function(req, res){
 
 							// make it public and send help details
 							createPublicSpace(req, space, {}, function(){
-								sendJoinDetails(publicspace);
 								sendHelpGroup(publicspace);
 							});
 
@@ -2445,11 +2447,13 @@ function sendHelpGroup(publicspace) {
 		supportMarkdown+
 		"**`help`** - List commands<br>\n"+
 		"\nYou can message me directly to search public and internal spaces.<br>\n\n";
-	sendResponse(publicspace.spaceId, markdown);
+	sendResponse(publicspace.spaceId, markdown, [], function(){
+		sendJoinDetails(publicspace);
+	});
 }
 
 // global function to send response message to space
-function sendResponse(spaceId, markdown, files = []) {
+function sendResponse(spaceId, markdown, files = [], success = undefined) {
 
 	// set options
 	var options = {
@@ -2464,6 +2468,10 @@ function sendResponse(spaceId, markdown, files = []) {
 	.then(function(message) {
 
 		// message sent
+
+		// success callback if defined
+		if (typeof(success) === "function")
+			success();
 
 	})
 	.catch(function(err){
@@ -2631,11 +2639,8 @@ function createPublicSpace(req, space, optionsOverride, success = undefined) {
 					success(options);
 
 				// default send join details
-				else {
+				else
 					sendJoinDetails(options);
-					sendHelpGroup(options);
-				}
-
 
 			}
 
@@ -2841,8 +2846,8 @@ function addJob(jobs, job) {
 
 // check if command was sent
 var commandMatch = function(commandRegExp, messageText) {
-	var botCommandRegExp = new RegExp('('+botDetails.displayName+'|'+botDetails.displayName.split(' ')[0]+'|\\b)'+commandRegExp+'\\b', 'i');
-	if (messageText.match(botCommandRegExp))
+	var botCommandRegExp = new RegExp('^('+botDetails.displayName+'|'+botDetails.displayName.split(' ')[0]+')\\s*'+commandRegExp+'\\b', 'i');
+	if (messageText.trim().match(botCommandRegExp))
 		return true;
 	else
 		return false;
